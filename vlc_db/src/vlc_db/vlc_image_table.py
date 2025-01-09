@@ -61,10 +61,10 @@ class VlcImageTable:
     def update_embedding(self, image_uuid: str, embedding):
         self.embedding_store[image_uuid] = embedding
 
-    def update_keypoints(self, image_uuid: str, keypoints):
+    def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
         self.keypoints_store[image_uuid] = keypoints
-
-    def update_descriptors(self, image_uuid: str, descriptors):
+        if descriptors is not None:
+            assert len(keypoints) == len(descriptors)
         self.descriptors_store[image_uuid] = descriptors
 
     def drop_image(self, image_uuid: str):

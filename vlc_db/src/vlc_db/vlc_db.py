@@ -46,6 +46,9 @@ class VlcDb:
             image_uuid, keypoints, descriptors=descriptors
         )
 
+    def get_keypoints(self, image_uuid: str):
+        return self._image_table.get_keypoints(image_uuid)
+
     def drop_image(self, image_uuid: str):
         """This functionality is for marginalization / sparsification of history"""
         self._image_table.drop_image(image_uuid)

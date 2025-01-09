@@ -15,7 +15,7 @@ session_id = vlc_db.add_session(robot_id)
 
 
 def insert_image(db, image):
-    uid = db.add_image(str(session_id), datetime.now(), SparkImage(rgb=image))
+    uid = db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
 
     # TODO: expand the example to generate these with a real VLC pipeline
     # db.update_embedding()
