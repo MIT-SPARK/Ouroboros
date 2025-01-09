@@ -10,5 +10,5 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={"": ["*.yaml"]},
-    install_requires=["numpy", "opencv-python"],
+    install_requires=["numpy", "imageio", "pyyaml"],
 )

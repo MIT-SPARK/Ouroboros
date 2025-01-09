@@ -19,13 +19,10 @@ class VlcDb:
     def add_image(
         self,
         session_id: str,
-        session_frame_id: int,
         image_timestamp: datetime,
         image: SparkImage,
     ) -> str:
-        return self._image_table.add_image(
-            session_id, session_frame_id, image_timestamp, image
-        )
+        return self._image_table.add_image(session_id, image_timestamp, image)
 
     def get_image(self, image_uuid):
         return self._image_table.get_image(image_uuid)
@@ -44,11 +41,10 @@ class VlcDb:
     def update_embedding(self, image_uuid: str, embedding):
         self._image_table.update_embedding(image_uuid, embedding)
 
-    def update_keypoints(self, image_uuid: str, keypoints):
-        self._image_table.update_keypoints(image_uuid, keypoints)
-
-    def update_descriptors(self, image_uuid: str, descriptors):
-        self._image_table.update_descriptors(image_uuid, descriptors)
+    def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
+        self._image_table.update_keypoints(
+            image_uuid, keypoints, descriptors=descriptors
+        )
 
     def drop_image(self, image_uuid: str):
         """This functionality is for marginalization / sparsification of history"""

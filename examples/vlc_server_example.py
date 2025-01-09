@@ -5,42 +5,40 @@ from vlc_db.spark_loop_closure import SparkLoopClosure
 from vlc_db.spark_image import SparkImage
 from datetime import datetime
 
-import cv2
+import imageio.v2 as imageio
 import numpy as np
 
 vlc_db = VlcDb(3)
 
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
-session_frame_id = 0
 
 
 def insert_image(db, image):
-    global session_frame_id
-    uid = db.add_image(
-        str(session_id), session_frame_id, datetime.now(), SparkImage(rgb=image)
-    )
-    session_frame_id += 1
+    uid = db.add_image(str(session_id), datetime.now(), SparkImage(rgb=image))
 
     # TODO: expand the example to generate these with a real VLC pipeline
     # db.update_embedding()
-    db.update_keypoints(uid, np.random.random((30, 2)))
-    db.update_descriptors(uid, np.random.random((30, 512)))
+    db.update_keypoints(
+        uid, np.random.random((30, 2)), descriptors=np.random.random((30, 512))
+    )
 
     return uid
 
 
 fn_a = files(vlc_resources).joinpath("left_img_0.png")
-img_a = cv2.imread(fn_a)
+
+img_a = imageio.imread(fn_a)
+
 
 fn_b = files(vlc_resources).joinpath("left_img_1.png")
-img_b = cv2.imread(fn_b)
+img_b = imageio.imread(fn_b)
 
 fn_c = files(vlc_resources).joinpath("right_img_1.png")
-img_c = cv2.imread(fn_c)
+img_c = imageio.imread(fn_c)
 
 fn_d = files(vlc_resources).joinpath("arch.jpg")
-img_d = cv2.imread(fn_d)
+img_d = imageio.imread(fn_d)
 
 
 a_id = insert_image(vlc_db, img_a)

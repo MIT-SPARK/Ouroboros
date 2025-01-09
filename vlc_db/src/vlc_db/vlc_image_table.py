@@ -45,7 +45,6 @@ class VlcImageTable:
     def add_image(
         self,
         session_id: str,
-        session_frame_id: int,
         image_timestamp: datetime,
         image: SparkImage,
     ) -> str:
@@ -53,7 +52,6 @@ class VlcImageTable:
         metadata = VlcImageMetadata(
             image_uuid=new_uuid,
             session_id=session_id,
-            session_frame_id=session_frame_id,
             timestamp=image_timestamp,
         )
         self.metadata_store[new_uuid] = metadata

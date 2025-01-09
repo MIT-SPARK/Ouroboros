@@ -10,7 +10,6 @@ from vlc_db.spark_image import SparkImage
 class VlcImageMetadata:
     image_uuid: str
     session_id: str
-    session_frame_id: int
     timestamp: datetime
 
 
