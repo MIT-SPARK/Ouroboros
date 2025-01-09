@@ -1,0 +1,69 @@
+from importlib.resources import files
+import vlc_resources
+from vlc_db.vlc_db import VlcDb
+from vlc_db.spark_loop_closure import SparkLoopClosure
+from vlc_db.spark_image import SparkImage
+from datetime import datetime
+
+import cv2
+import numpy as np
+
+vlc_db = VlcDb(3)
+
+robot_id = 0
+session_id = vlc_db.add_session(robot_id)
+session_frame_id = 0
+
+
+def insert_image(db, image):
+    global session_frame_id
+    uid = db.add_image(
+        str(session_id), session_frame_id, datetime.now(), SparkImage(rgb=image)
+    )
+    session_frame_id += 1
+
+    # TODO: expand the example to generate these with a real VLC pipeline
+    # db.update_embedding()
+    db.update_keypoints(uid, np.random.random((30, 2)))
+    db.update_descriptors(uid, np.random.random((30, 512)))
+
+    return uid
+
+
+fn_a = files(vlc_resources).joinpath("left_img_0.png")
+img_a = cv2.imread(fn_a)
+
+fn_b = files(vlc_resources).joinpath("left_img_1.png")
+img_b = cv2.imread(fn_b)
+
+fn_c = files(vlc_resources).joinpath("right_img_1.png")
+img_c = cv2.imread(fn_c)
+
+fn_d = files(vlc_resources).joinpath("arch.jpg")
+img_d = cv2.imread(fn_d)
+
+
+a_id = insert_image(vlc_db, img_a)
+vlc_db.update_embedding(a_id, np.array([1, 0, 0]))
+
+b_id = insert_image(vlc_db, img_b)
+vlc_db.update_embedding(b_id, np.array([0, 1, 1]))
+
+c_id = insert_image(vlc_db, img_c)
+vlc_db.update_embedding(c_id, np.array([0, 1.1, 1.1]))
+
+d_id = insert_image(vlc_db, img_d)
+vlc_db.update_embedding(d_id, np.array([10, 2, 2]))
+
+
+print("Print: vlc_db.image_table.get_image[a_id]:")
+print(vlc_db.get_image(a_id))
+
+print("Querying 0,1,1")
+imgs, dists = vlc_db.query_embeddings(np.array([[0, 1, 1]]), 2)
+
+computed_ts = datetime.now()
+loop_closure = SparkLoopClosure(
+    from_robot_id=0, to_robot_id=1, f_T_t=np.eye(4), timestamp=datetime.now(), quality=1
+)
+lc_uuid = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts)
