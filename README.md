@@ -6,6 +6,10 @@ pip install from inside `vlc_db` and again from `vlc_resources`. I guess we shou
 
 See the example in `examples` to get an idea of how to use the interface so far.
 
+## Example ROS Integration
+
+`ouroboros_ros` is a valid ROS package that has an example of a node that generates "ground truth" loop closures. It queries the tf tree for the specified tf, and occasionally publishes a loop closure message where appropriate. You can try this example by building `ouroboros_ros` in your ROS workspace, running `roslaunch ouroboros_ros ground_truth_lc_node.launch`, and then playing a rosbag with the appropriate tfs. See `ouroboros_ros/config/ground_truth_lc_node.yaml` for configuration information.
+
 ## Interface Notes
 
 The central feature of the library is the `VlcDb` database for visual loop closures (see `vlc_db.py`). This class provides an interface for storing, updating, and querying keyframe images, embeddings, keypoints, descriptors, and loop closures. The "VLC Server" will be built on top of this. Currently the interface to this database is:
