@@ -1,4 +1,4 @@
-from importlib.resources import files
+from importlib_resources import files
 import vlc_resources
 from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
@@ -27,7 +27,6 @@ def insert_image(db, image):
 
 
 fn_a = files(vlc_resources).joinpath("left_img_0.png")
-
 img_a = imageio.imread(fn_a)
 
 
@@ -62,6 +61,15 @@ imgs, dists = vlc_db.query_embeddings(np.array([[0, 1, 1]]), 2)
 
 computed_ts = datetime.now()
 loop_closure = SparkLoopClosure(
-    from_robot_id=0, to_robot_id=1, f_T_t=np.eye(4), timestamp=datetime.now(), quality=1
+    from_image_uuid=a_id,
+    to_image_uuid=b_id,
+    f_T_t=np.eye(4),
+    quality=1,
 )
+
+# If you want to add a loop closure where the two poses do not correspond to
+# keyframe images in the database (not totally clear why you would want to do
+# this), you should just insert the two times into the database as images with
+# image=None
+
 lc_uuid = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts)

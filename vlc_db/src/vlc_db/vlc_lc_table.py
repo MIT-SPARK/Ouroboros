@@ -1,5 +1,5 @@
+import time
 import uuid
-from datetime import datetime
 
 from vlc_db.spark_loop_closure import SparkLoopClosure, SparkLoopClosureMetadata
 
@@ -11,7 +11,7 @@ class LcTable:
     def add_lc(self, loop_closure: SparkLoopClosure, session_uuid, creation_time=None):
         lc_uuid = str(uuid.uuid4())
         if creation_time is None:
-            creation_time = datetime.now()
+            creation_time = int(time.time() * 1e9)
         metadata = SparkLoopClosureMetadata(
             lc_uuid=lc_uuid, session_uuid=session_uuid, creation_time=creation_time
         )

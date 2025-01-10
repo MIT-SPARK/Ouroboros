@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 
 import numpy as np
 
@@ -10,7 +9,7 @@ from vlc_db.spark_image import SparkImage
 class VlcImageMetadata:
     image_uuid: str
     session_id: str
-    timestamp: datetime
+    epoch_ns: int
 
 
 @dataclass

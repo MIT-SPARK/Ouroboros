@@ -1,7 +1,9 @@
 import uuid
+from typing import Union
 from datetime import datetime
 
 from vlc_db.spark_session import SparkSession
+from vlc_db.utils import epoch_ns_from_datetime
 
 
 class SessionTable:
@@ -18,7 +20,7 @@ class SessionTable:
     def insert_session(
         self,
         session_uuid: str,
-        start_time: datetime,
+        start_time: Union[int, datetime],
         robot_id: int,
         sensor_id: int = 0,
         name: str = None,
@@ -27,6 +29,9 @@ class SessionTable:
 
         if name is None:
             name = session_uuid
+
+        if isinstance(start_time, datetime):
+            start_time = epoch_ns_from_datetime(start_time)
 
         spark_session = SparkSession(
             session_uuid=session_uuid,

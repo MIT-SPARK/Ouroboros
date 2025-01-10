@@ -1,20 +1,18 @@
 from dataclasses import dataclass
 import numpy as np
-import datetime
 
 
 @dataclass
 class SparkLoopClosureMetadata:
     lc_uuid: str
     session_uuid: str
-    creation_time: datetime
+    creation_time: int
 
 
 @dataclass
 class SparkLoopClosure:
-    from_robot_id: int
-    to_robot_id: int
+    from_image_uuid: str
+    to_image_uuid: str
     f_T_t: np.ndarray  # 4x4
-    timestamp: datetime
     quality: float
     metadata: SparkLoopClosureMetadata = None

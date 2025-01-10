@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from datetime import datetime
 
 
 @dataclass
 class SparkSession:
     session_uuid: str
-    start_time: datetime
+    start_time: int
     name: str
     robot_id: int
     sensor_id: int

@@ -3,8 +3,10 @@ import numpy as np
 
 class InvertibleVectorStore:
     # TODO: Replace with this? https://github.com/nmslib/hnswlib/
-    def __init__(self, n_dim, metric="ip"):
-        self._metric = metric
+    def __init__(
+        self,
+        n_dim,
+    ):
         self._vectors = np.empty((0, n_dim))
         self._uuid_to_vector = {}
         self._local_idx_to_uuid = {}
@@ -18,20 +20,32 @@ class InvertibleVectorStore:
         idx = len(self._vectors) - 1
         self._local_idx_to_uuid[idx] = key
 
-    def query(self, embeddings, k=1):
-        if self._metric == "ip":
-            dists = -self._vectors @ embeddings.T
-            uuid_list = []
-            distance_list = []
-            for col in range(dists.shape[1]):
-                indices = np.squeeze(dists[:, col]).argsort()[:k]
-                uuid_list.append([self._local_idx_to_uuid[i] for i in indices])
+    def query(self, embeddings, k=1, distance_metric="ip"):
+        if distance_metric == "ip":
+            distances = embeddings @ self._vectors.T
 
-                min_dists = np.sort(np.squeeze(dists[:, col]))[:k]
-                distance_list.append(min_dists)
+        elif distance_metric == "cos":
+            raise NotImplementedError(
+                "Cosine similarity not yet implemented as distance metric"
+            )
+        elif callable(distance_metric):
+            distances = np.zeros((len(embeddings), len(self._vectors)))
+            for ex, e in enumerate(embeddings):
+                for vx, v in enumerate(self._vectors):
+                    distances[ex, vx] = distance_metric(e, v)
 
-            return uuid_list, distance_list
         else:
             raise NotImplementedError(
-                "InvertibleVectorStore only implements inner product and query method"
+                "InvertibleVectorStore only implements inner product and custom query methods"
             )
+
+        uuid_list = []
+        distance_list = []
+        for row in range(distances.shape[0]):
+            indices = np.squeeze(distances[row, :]).argsort()[:k]
+            uuid_list.append([self._local_idx_to_uuid[i] for i in indices])
+
+            min_dists = np.sort(distances[row, :])[:k]
+            distance_list.append(min_dists)
+
+        return uuid_list, distance_list

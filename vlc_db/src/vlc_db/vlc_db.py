@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union
 import numpy as np
 
 from vlc_db.spark_image import SparkImage
@@ -19,16 +20,23 @@ class VlcDb:
     def add_image(
         self,
         session_id: str,
-        image_timestamp: datetime,
+        image_timestamp: Union[int, datetime],
         image: SparkImage,
     ) -> str:
         return self._image_table.add_image(session_id, image_timestamp, image)
 
-    def get_image(self, image_uuid):
+    def get_image(self, image_uuid: str) -> VlcImage:
         return self._image_table.get_image(image_uuid)
 
+    def iterate_images(self) -> VlcImage:
+        for image in self._image_table.iterate_images():
+            yield image
+
     def query_embeddings(
-        self, embeddings: np.ndarray, k: int
+        self,
+        embeddings: np.ndarray,
+        k: int,
+        distance_metric: Union[str, callable] = "ip",
     ) -> ([[VlcImage]], [[float]]):
         """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
         Queries for the top k matches.
@@ -36,7 +44,7 @@ class VlcDb:
         Returns the top k closest matches and the match distances
         """
 
-        return self._image_table.query_embeddings(embeddings, k)
+        return self._image_table.query_embeddings(embeddings, k, distance_metric)
 
     def update_embedding(self, image_uuid: str, embedding):
         self._image_table.update_embedding(image_uuid, embedding)
