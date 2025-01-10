@@ -1,7 +1,9 @@
 from datetime import datetime
 
-import imageio.v2 as imageio
 import numpy as np
+import matplotlib.pyplot as plt
+
+from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
@@ -13,8 +15,16 @@ lc_lockout = 30  # minimal time between two frames in loop closure
 place_recognition_threshold = 1
 
 # Load Data
-image_dir = ""
-pose_dir = ""
+data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
+rgb_topic = "/tesse/left_cam/rgb/image_raw"
+rgb_info_topic = "/tesse/left_cam/camera_info"
+body_frame = "base_link_gt"
+body_frame = "base_link_gt"
+map_frame = "world"
+
+loader = RosbagDataLoader(
+    data_path, rgb_topic, rgb_info_topic, body_frame=body_frame, map_frame=map_frame
+)
 
 images = None  # numpy array
 poses = None  # 7d vector
@@ -28,13 +38,16 @@ uid_to_pose = {}
 ### Batch LCD
 
 # Place embeddings
-for image, pose in zip(images, poses):
-    uid = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
-    embedding = model(image)
-    vlc_db.update_embedding(uid, embedding)
+with loader:
+    for data in loader:
+        image = data.color
+        pose = data.pose
+        uid = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
+        embedding = model(image)
+        vlc_db.update_embedding(uid, embedding)
 
-    # To check our estimate vs. GT later
-    uid_to_pose[uid] = pose
+        # To check our estimate vs. GT later
+        uid_to_pose[uid] = pose
 
 
 # Query for closest matches
@@ -78,9 +91,39 @@ for key_from, key_to in putative_loop_closures:
         vlc_db.update_keypoints(key_to, keypoints, descriptors)
         img_to = vlc_db.get_image(key_to)
 
-    relative_pose = recover_pose(img_from, img_to)
+    relative_pose, quality = recover_pose(img_from, img_to)
+    loop_closure = SparkLoopClosure(
+        from_image_uuid=key_from,
+        to_image_uuid=key_to,
+        f_T_t=relative_pose,
+        quality=quality,
+    )
+    vlc_db.add_lc(loop_closure, session_id, creation_time=datetime.now())
 
-# uuids = vlc_db.get_image_keys()
-# positions = np.array([pose.position for pose in poses])
 
-# Plot estimated loop closures on ground truth trajectory
+# Plot estimated loop closures and ground truth trajectory
+positions = np.array([p.translation for p in uid_to_pose[uid].values()])
+plt.plot(positions[:, 0], positions[:, 1], color="k")
+plt.scatter(positions[:, 0], positions[:, 1], color="k")
+
+
+for lc in vlc_db.iterate_lcs():
+    w_T_from = uid_to_pose[lc.from_image_uuid]
+    w_T_to = uid_to_pose[lc.to_image_uuid]
+
+    inferred_pose_to = w_T_from @ lc.f_T_t
+
+    # Plot point for the ground truth poses involved in the loop closure
+    plt.scatter(
+        [w_T_from[0, 3], w_T_to[0, 3]],
+        [w_T_from[1, 3], w_T_to[1, 3]],
+        color="r",
+    )
+
+    plt.plot(
+        [w_T_from[0, 3], inferred_pose_to[0, 3]],
+        [w_T_from[1, 3], inferred_pose_to[1, 3]],
+        color="r",
+    )
+
+plt.show()

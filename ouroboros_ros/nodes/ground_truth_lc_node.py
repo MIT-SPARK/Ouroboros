@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from dataclasses import dataclass
 import functools
 import rospy
 import numpy as np
@@ -15,20 +14,7 @@ import tf2_ros
 
 from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
-
-
-@dataclass
-class VlcPose:
-    time_ns: int
-    position: np.ndarray  # x,y,z
-    rotation: np.ndarray  # qx, qy, qz
-
-    def to_descriptor(self):
-        return np.hstack([[self.time_ns], self.position, self.rotation])
-
-    @classmethod
-    def from_descriptor(cls, d):
-        return cls(time_ns=d[0], position=d[1:4], rotation=d[4:])
+from vlc_db.gt_lc_utils import VlcPose, compute_descriptor_distance
 
 
 # Hydra takes too long to add agent poses to the backend, so if we send the LC
@@ -100,7 +86,6 @@ def get_tf_as_descriptor(tf_buffer, fixed_frame, body_frame):
 
 
 def update_plot(line, pts, vlc_db):
-
     positions = []
     for image in vlc_db.iterate_images():
         positions.append(VlcPose.from_descriptor(image.embedding).position)
@@ -116,24 +101,6 @@ def update_plot(line, pts, vlc_db):
     mypause(0.05)
 
 
-def compute_descriptor_distance(
-    lc_recent_pose_lockout_ns, lc_distance_threshold, d_query, d_stored
-):
-
-    query_pose = VlcPose.from_descriptor(d_query)
-    stored_pose = VlcPose.from_descriptor(d_stored)
-
-    if stored_pose.time_ns > query_pose.time_ns - lc_recent_pose_lockout_ns:
-        return np.inf
-
-    d = np.linalg.norm(query_pose.position - stored_pose.position)
-
-    if d > lc_distance_threshold:
-        return np.inf
-    else:
-        return d
-
-
 def plot_lc(qd, md):
     qp = VlcPose.from_descriptor(qd).position
     mp = VlcPose.from_descriptor(md).position
@@ -145,7 +112,6 @@ def plot_lc(qd, md):
 
 
 def recover_pose(query_descriptors, match_descriptors):
-
     query_pose = VlcPose.from_descriptor(query_descriptors[0])
     match_pose = VlcPose.from_descriptor(match_descriptors[0])
 

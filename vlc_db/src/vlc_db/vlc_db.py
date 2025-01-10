@@ -31,7 +31,7 @@ class VlcDb:
     def get_image_keys(self) -> [str]:
         return self._image_table.get_image_keys()
 
-    def iterate_images(self) -> VlcImage:
+    def iterate_images(self):
         for image in self._image_table.iterate_images():
             yield image
 
@@ -80,3 +80,7 @@ class VlcDb:
 
     def get_lc(self, lc_uuid: str):
         return self._lc_table.get_lc(lc_uuid)
+
+    def iterate_lcs(self):
+        for lc in self._lc_table.iterate_lcs():
+            yield lc

@@ -22,3 +22,11 @@ class LcTable:
 
     def get_lc(self, lc_uuid: str) -> SparkLoopClosure:
         return self._lc_store[lc_uuid]
+
+    def iterate_lcs(self):
+        """Iterate through loop closures according to ascending computed timestamp"""
+        ts_keys = [
+            (lc.metadata.creation_time, key) for key, lc in self._lc_store.items()
+        ]
+        for _, uid in sorted(ts_keys):
+            yield self.get_lc(uid)
