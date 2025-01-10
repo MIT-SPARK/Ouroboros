@@ -28,6 +28,9 @@ class VlcDb:
     def get_image(self, image_uuid: str) -> VlcImage:
         return self._image_table.get_image(image_uuid)
 
+    def get_image_keys(self) -> [str]:
+        return self._image_table.get_image_keys()
+
     def iterate_images(self) -> VlcImage:
         for image in self._image_table.iterate_images():
             yield image

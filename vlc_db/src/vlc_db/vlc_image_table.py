@@ -29,13 +29,16 @@ class VlcImageTable:
         vlc_image = VlcImage(metadata, image, embedding, keypoints, descriptors)
         return vlc_image
 
-    def iterate_images(self):
-        """Iterate through images according to ascending timestamp"""
+    def get_image_keys(self):
         ts_keys = [
             (metadata.epoch_ns, key) for key, metadata in self.metadata_store.items()
         ]
-        for _, uid in sorted(ts_keys):
-            yield self.get_image(uid)
+        return [key for _, key in sorted(ts_keys)]
+
+    def iterate_images(self):
+        """Iterate through images according to ascending timestamp"""
+        for key in self.get_image_keys():
+            yield self.get_image(key)
 
     def query_embeddings(
         self,
