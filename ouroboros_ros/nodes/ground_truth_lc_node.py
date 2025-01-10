@@ -14,30 +14,17 @@ import tf2_ros
 
 from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.gt_lc_utils import VlcPose, compute_descriptor_distance
+from vlc_db.gt_lc_utils import (
+    VlcPose,
+    compute_descriptor_distance,
+    recover_pose,
+)
 
 
 # Hydra takes too long to add agent poses to the backend, so if we send the LC
 # immediately it will get rejected. To work around this, we can't send the loop
 # closure until several seconds after it is detected
 loop_closure_delayed_queue = []
-
-
-def invert_pose(p):
-    p_inv = np.zeros((4, 4))
-    p_inv[:3, :3] = p[:3, :3].T
-    p_inv[:3, 3] = -p[:3, :3].T @ p[:3, 3]
-    p_inv[3, 3] = 1
-    return p_inv
-
-
-def pose_from_quat_trans(q, t):
-    pose = np.zeros((4, 4))
-    Rmat = R.from_quat(q).as_matrix()
-    pose[:3, :3] = Rmat
-    pose[:3, 3] = t
-    pose[3, 3] = 1
-    return pose
 
 
 def mypause(interval):
@@ -111,18 +98,6 @@ def plot_lc(qd, md):
     )
 
 
-def recover_pose(query_descriptors, match_descriptors):
-    query_pose = VlcPose.from_descriptor(query_descriptors[0])
-    match_pose = VlcPose.from_descriptor(match_descriptors[0])
-
-    w_T_cur = pose_from_quat_trans(query_pose.rotation, query_pose.position)
-    w_T_old = pose_from_quat_trans(match_pose.rotation, match_pose.position)
-
-    old_T_new = invert_pose(invert_pose(w_T_old) @ w_T_cur)
-
-    return old_T_new
-
-
 def compute_lc(
     lc_recent_pose_lockout_ns,
     lc_distance_threshold,
@@ -131,7 +106,6 @@ def compute_lc(
     vlc_db,
     last_uid,
 ):
-
     if last_uid is None:
         return
 

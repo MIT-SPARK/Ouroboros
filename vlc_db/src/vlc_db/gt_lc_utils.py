@@ -1,5 +1,23 @@
 from dataclasses import dataclass
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+
+def invert_pose(p):
+    p_inv = np.zeros((4, 4))
+    p_inv[:3, :3] = p[:3, :3].T
+    p_inv[:3, 3] = -p[:3, :3].T @ p[:3, 3]
+    p_inv[3, 3] = 1
+    return p_inv
+
+
+def pose_from_quat_trans(q, t):
+    pose = np.zeros((4, 4))
+    Rmat = R.from_quat(q).as_matrix()
+    pose[:3, :3] = Rmat
+    pose[:3, 3] = t
+    pose[3, 3] = 1
+    return pose
 
 
 @dataclass
@@ -31,3 +49,15 @@ def compute_descriptor_distance(
         return np.inf
     else:
         return d
+
+
+def recover_pose(query_descriptors, match_descriptors):
+    query_pose = VlcPose.from_descriptor(query_descriptors[0])
+    match_pose = VlcPose.from_descriptor(match_descriptors[0])
+
+    w_T_cur = pose_from_quat_trans(query_pose.rotation, query_pose.position)
+    w_T_old = pose_from_quat_trans(match_pose.rotation, match_pose.position)
+
+    old_T_new = invert_pose(invert_pose(w_T_old) @ w_T_cur)
+
+    return old_T_new

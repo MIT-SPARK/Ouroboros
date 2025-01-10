@@ -55,8 +55,9 @@ class VlcImageTable:
         uuid_lists, distance_lists = self.embedding_store.query(
             embeddings, k, distance_metric
         )
+        images = []
         for uuids, distances in zip(uuid_lists, distance_lists):
-            images = [self.get_image(uid) for uid in uuids]
+            images.append([self.get_image(uid) for uid in uuids])
 
         return images, distance_lists
 
@@ -78,6 +79,8 @@ class VlcImageTable:
         )
         self.metadata_store[new_uuid] = metadata
         self.image_store[new_uuid] = image
+        self.keypoints_store[new_uuid] = None
+        self.descriptors_store[new_uuid] = None
         return new_uuid
 
     def update_embedding(self, image_uuid: str, embedding):
