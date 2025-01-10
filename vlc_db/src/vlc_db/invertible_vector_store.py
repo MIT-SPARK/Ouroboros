@@ -36,16 +36,22 @@ class InvertibleVectorStore:
 
         else:
             raise NotImplementedError(
-                "InvertibleVectorStore only implements inner product and custom query methods"
+                f"InvertibleVectorStore does not implement distance metric {distance_metric}"
             )
 
         uuid_list = []
         distance_list = []
         for row in range(distances.shape[0]):
-            indices = np.squeeze(distances[row, :]).argsort()[:k]
+            if k > 0:
+                indices = np.squeeze(distances[row, :]).argsort()[:k]
+            else:
+                indices = np.squeeze(distances[row, :]).argsort()
             uuid_list.append([self._local_idx_to_uuid[i] for i in indices])
 
-            min_dists = np.sort(distances[row, :])[:k]
+            if k > 0:
+                min_dists = np.sort(distances[row, :])[:k]
+            else:
+                min_dists = np.sort(distances[row, :])
             distance_list.append(min_dists)
 
         return uuid_list, distance_list
