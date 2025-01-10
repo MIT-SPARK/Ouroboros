@@ -174,14 +174,14 @@ def compute_lc(
         compute_descriptor_distance, lc_recent_pose_lockout_ns, lc_distance_threshold
     )
     (nearest, distances) = vlc_db.query_embeddings(
-        np.array([query_embedding]), 2, distance_metric=query_fn
+        np.array([query_embedding]), 1, distance_metric=query_fn
     )
 
-    if len(distances[0]) < 2 or np.isinf(distances[0][1]):
+    if np.isinf(distances[0][0]):
         return
 
-    match_uid = nearest[1].metadata.image_uuid
-    match_time = nearest[1].metadata.epoch_ns
+    match_uid = nearest[0].metadata.image_uuid
+    match_time = nearest[0].metadata.epoch_ns
 
     query_kps, query_descriptors = vlc_db.get_keypoints(last_uid)
     match_kps, match_descriptors = vlc_db.get_keypoints(match_uid)
