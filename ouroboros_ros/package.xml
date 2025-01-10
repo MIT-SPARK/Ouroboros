@@ -1,0 +1,14 @@
+<package format="2">
+  <name>ouroboros_ros</name>
+  <version>0.0.0</version>
+  <description>ROS interface for Ouroboros VLC Server</description>
+  <maintainer email="aaronray@mit.edu">Aaron Ray</maintainer>
+
+  <license>MIT</license>
+
+  <!-- Dependencies which this package needs to build itself. -->
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>python3-matplotlib</depend>
+  <depend>python3-scipy</depend>
+</package>

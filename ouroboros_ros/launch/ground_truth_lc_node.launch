@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="ouroboros_ros" type="ground_truth_lc_node.py" name="ground_truth_lc_node" required="true" output="screen" >
+        <rosparam command="load" file="$(find ouroboros_ros)/config/ground_truth_lc_node.yaml" subst_value="true"/>
+  </node>
+</launch>
