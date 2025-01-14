@@ -34,7 +34,7 @@ class VlcPose:
         return cls(time_ns=d[0], position=d[1:4], rotation=d[4:])
 
 
-def compute_descriptor_distance(
+def compute_descriptor_similarity(
     lc_recent_pose_lockout_ns, lc_distance_threshold, d_query, d_stored
 ):
     query_pose = VlcPose.from_descriptor(d_query)
@@ -46,9 +46,9 @@ def compute_descriptor_distance(
     d = np.linalg.norm(query_pose.position - stored_pose.position)
 
     if d > lc_distance_threshold:
-        return np.inf
+        return -np.inf
     else:
-        return d
+        return -d
 
 
 def recover_pose(query_descriptors, match_descriptors):

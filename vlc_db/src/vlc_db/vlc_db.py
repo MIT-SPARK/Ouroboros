@@ -39,7 +39,7 @@ class VlcDb:
         self,
         embeddings: np.ndarray,
         k: int,
-        distance_metric: Union[str, callable] = "ip",
+        similarity_metric: Union[str, callable] = "ip",
     ) -> ([[VlcImage]], [[float]]):
         """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
         Queries for the top k matches.
@@ -47,7 +47,7 @@ class VlcDb:
         Returns the top k closest matches and the match distances
         """
 
-        return self._image_table.query_embeddings(embeddings, k, distance_metric)
+        return self._image_table.query_embeddings(embeddings, k, similarity_metric)
 
     def update_embedding(self, image_uuid: str, embedding):
         self._image_table.update_embedding(image_uuid, embedding)

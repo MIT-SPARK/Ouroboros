@@ -20,38 +20,38 @@ class InvertibleVectorStore:
         idx = len(self._vectors) - 1
         self._local_idx_to_uuid[idx] = key
 
-    def query(self, embeddings, k=1, distance_metric="ip"):
-        if distance_metric == "ip":
-            distances = embeddings @ self._vectors.T
+    def query(self, embeddings, k=1, similarity_metric="ip"):
+        if similarity_metric == "ip":
+            similarities = embeddings @ self._vectors.T
 
-        elif distance_metric == "cos":
+        elif similarity_metric == "cos":
             raise NotImplementedError(
-                "Cosine similarity not yet implemented as distance metric"
+                "Cosine similarity not yet implemented as similarity metric"
             )
-        elif callable(distance_metric):
-            distances = np.zeros((len(embeddings), len(self._vectors)))
+        elif callable(similarity_metric):
+            similarities = np.zeros((len(embeddings), len(self._vectors)))
             for ex, e in enumerate(embeddings):
                 for vx, v in enumerate(self._vectors):
-                    distances[ex, vx] = distance_metric(e, v)
+                    similarities[ex, vx] = similarity_metric(e, v)
 
         else:
             raise NotImplementedError(
-                f"InvertibleVectorStore does not implement distance metric {distance_metric}"
+                f"InvertibleVectorStore does not implement similarity metric {similarity_metric}"
             )
 
         uuid_list = []
-        distance_list = []
-        for row in range(distances.shape[0]):
+        similarity_list = []
+        for row in range(similarities.shape[0]):
             if k > 0:
-                indices = np.squeeze(distances[row, :]).argsort()[:k]
+                indices = np.squeeze(-similarities[row, :]).argsort()[:k]
             else:
-                indices = np.squeeze(distances[row, :]).argsort()
+                indices = np.squeeze(-similarities[row, :]).argsort()
             uuid_list.append([self._local_idx_to_uuid[i] for i in indices])
 
             if k > 0:
-                min_dists = np.sort(distances[row, :])[:k]
+                max_similarities = -np.sort(-similarities[row, :])[:k]
             else:
-                min_dists = np.sort(distances[row, :])
-            distance_list.append(min_dists)
+                max_similarities = -np.sort(-similarities[row, :])
+            similarity_list.append(max_similarities)
 
-        return uuid_list, distance_list
+        return uuid_list, similarity_list

@@ -16,7 +16,7 @@ from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
 from vlc_db.gt_lc_utils import (
     VlcPose,
-    compute_descriptor_distance,
+    compute_descriptor_similarity,
     recover_pose,
 )
 
@@ -111,7 +111,7 @@ def compute_lc(
 
     query_embedding = vlc_db.get_image(last_uid).embedding
     query_fn = functools.partial(
-        compute_descriptor_distance, lc_recent_pose_lockout_ns, lc_distance_threshold
+        compute_descriptor_similarity, lc_recent_pose_lockout_ns, lc_distance_threshold
     )
     (nearest, distances) = vlc_db.query_embeddings(
         np.array([query_embedding]), 1, distance_metric=query_fn
