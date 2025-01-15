@@ -14,11 +14,10 @@ def get_salad_model():
     model = torch.hub.load("serizba/salad", "dinov2_salad")
     model = model.to("cuda")
 
-    trans = input_transform((322, 322))
+    trans = input_transform((322, 434))
 
     def call_model(img_in):
-        #img_float = torch.tensor((img_in.transpose() / 255.0).astype(np.float32))
-        img_float = torch.tensor((img_in.transpose()).astype(np.float32))
+        img_float = torch.tensor((img_in.transpose() / 255.0).astype(np.float32))
         img = trans(img_float)
         out = model(img.unsqueeze(0).to("cuda")).cpu().detach().numpy()
         return np.squeeze(out)

@@ -27,10 +27,10 @@ def combine_images(left, right):
     return img_out
 
 
-lc_lockout = 10  # minimal time between two frames in loop closure
+lc_lockout = 5  # minimal time between two frames in loop closure
 
 # If s(a,b) is the similarity between image embeddings a and b, if s(a,b) < place_recognition_threshold are not considered putative loop closures
-place_recognition_threshold = 0.96
+place_recognition_threshold = 0.55
 
 # Load Data
 data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
@@ -83,6 +83,8 @@ matches, similarities = vlc_db.query_embeddings(
 
 # TODO: move this to db query or utility function
 # Ignore matches that are too close temporally or too far in descriptor similarity
+times = []
+closest = []
 putative_loop_closures = []
 for key, matches_for_query, similarities_for_query in tqdm(
     zip(vlc_db.get_image_keys(), matches, similarities), total=len(matches)
@@ -95,8 +97,11 @@ for key, matches_for_query, similarities_for_query in tqdm(
             match_uuid = match_image.metadata.image_uuid
             break
 
-        if similarity < place_recognition_threshold:
-            break
+    times.append(ts / 1e9)
+    closest.append(similarity)
+
+    if similarity < place_recognition_threshold:
+        match_uuid = None
 
     if match_uuid is None:
         putative_loop_closures.append((key, None))
@@ -104,6 +109,12 @@ for key, matches_for_query, similarities_for_query in tqdm(
 
     putative_loop_closures.append((key, match_uuid))
 
+t = [ti - times[0] for ti in times]
+plt.ion()
+plt.plot(t, closest)
+plt.xlabel("Time (s)")
+plt.ylabel("Best Descriptor Similarity")
+plt.title("Closest Descriptor s.t. Time Constraint")
 for key, match_key in tqdm(putative_loop_closures):
     left = vlc_db.get_image(key).image.rgb
     if match_key is None:
