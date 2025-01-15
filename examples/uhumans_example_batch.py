@@ -3,19 +3,32 @@ import functools
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial.transform import Rotation as R
 
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 from vlc_db.vlc_db import VlcDb
 from vlc_db.spark_loop_closure import SparkLoopClosure
 from vlc_db.spark_image import SparkImage
-from vlc_db.gt_lc_utils import VlcPose, recover_pose, compute_descriptor_distance
+from vlc_db.gt_lc_utils import VlcPose, recover_pose, compute_descriptor_similarity
 
-lc_lockout = 30  # minimal time between two frames in loop closure
-gt_lc_max_dist = 10
+from salad_example import get_salad_model
 
-# If d(a,b) is the distance between image embeddings a and b, if d(a,b) > place_recognition_threshold are not considered putative loop closures
-place_recognition_threshold = 1
+
+def plot_heading(positions, rpy):
+    for p, angles in zip(positions, rpy):
+        y = angles[2] + np.pi / 2
+        plt.plot([p[0], p[0] + np.cos(y)], [p[1], p[1] + np.sin(y)], color="k")
+
+
+embedding_model = get_salad_model()
+
+
+lc_lockout = 5  # minimal time between two frames in loop closure
+gt_lc_max_dist = 5
+
+# If s(a,b) is the similarity between image embeddings a and b, if s(a,b) < place_recognition_threshold are not considered putative loop closures
+place_recognition_threshold = 0.55
 
 # Load Data
 data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
@@ -32,27 +45,33 @@ loader = RosbagDataLoader(
 images = None  # numpy array
 poses = None  # 7d vector
 
-vlc_db = VlcDb(8)
+vlc_db = VlcDb(8448)
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
 
 uid_to_pose = {}
-
+full_poses = []
 
 ### Batch LCD
 
 # Place embeddings
+print("Loading...")
 with loader:
-    for data in loader:
+    print("Loaded!")
+    for idx, data in enumerate(loader):
         image = data.color
         pose = data.pose
+        full_poses.append(pose.matrix())
+
+        if not idx % 2 == 0:
+            continue
         uid = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
-        # embedding = embedding_model(image)
-        embedding = VlcPose(
-            time_ns=data.timestamp,
-            position=pose.translation,
-            rotation=pose.rotation.as_quat(),
-        ).to_descriptor()  # Will go away when we use real model
+        embedding = embedding_model(image)
+        # embedding = VlcPose(
+        #    time_ns=data.timestamp,
+        #    position=pose.translation,
+        #    rotation=pose.rotation.as_quat(),
+        # ).to_descriptor()  # Will go away when we use real model
         vlc_db.update_embedding(uid, embedding)
 
         # To check our estimate vs. GT later
@@ -62,34 +81,35 @@ with loader:
 # Query for closest matches
 query_embeddings = np.array([image.embedding for image in vlc_db.iterate_images()])
 
-query_fn = functools.partial(
-    compute_descriptor_distance, lc_lockout * 1e9, gt_lc_max_dist
-)
+# query_fn = functools.partial(
+#    compute_descriptor_similarity, lc_lockout * 1e9, gt_lc_max_dist
+# )
 
-matches, distances = vlc_db.query_embeddings(
-    np.array(query_embeddings), 1, distance_metric=query_fn
-)
+# matches, similarities = vlc_db.query_embeddings(
+#    np.array(query_embeddings), 1, similarity_metric=query_fn
+# )
 
-# matches, distances = vlc_db.query_embeddings(
-#    query_embeddings, -1
-# )  # TODO: specify which distance metric we want to use
+
+matches, similarities = vlc_db.query_embeddings(
+    query_embeddings, -1, similarity_metric="ip"
+)
 
 
 # TODO: move this to db query or utility function
-# Ignore matches that are too close temporally or too far in descriptor distance
+# Ignore matches that are too close temporally or too far in descriptor similarity
 putative_loop_closures = []
-for key, matches_for_query, distances_for_query in zip(
-    vlc_db.get_image_keys(), matches, distances
+for key, matches_for_query, similarities_for_query in zip(
+    vlc_db.get_image_keys(), matches, similarities
 ):
     ts = vlc_db.get_image(key).metadata.epoch_ns
-    for match_image, distance in zip(matches_for_query, distances_for_query):
+    match_uuid = None
+    for match_image, similarity in zip(matches_for_query, similarities_for_query):
         match_ts = match_image.metadata.epoch_ns
-        if abs(match_ts - ts) > lc_lockout and ts > match_ts:
+        if abs(match_ts - ts) > lc_lockout * 1e9 and ts > match_ts:
             match_uuid = match_image.metadata.image_uuid
             break
 
-        if distance > place_recognition_threshold:
-            match_uuid = None
+        if similarity < place_recognition_threshold:
             break
 
     if match_uuid is None:
@@ -105,7 +125,14 @@ for key_from, key_to in putative_loop_closures:
         # keypoints = generate_keypoints(img_from.image)
         # descriptors = generate_descriptors(img_from.image)
         keypoints = np.zeros([1, 2])
-        descriptors = [img_from.embedding]
+        pose = uid_to_pose[key_from]
+        desc = VlcPose(
+            time_ns=img_from.metadata.epoch_ns,
+            position=pose[:3, 3],
+            rotation=R.from_matrix(pose[:3, :3]).as_quat(),
+        ).to_descriptor()
+        descriptors = [desc]
+        # descriptors = [img_from.embedding]
 
         vlc_db.update_keypoints(key_from, keypoints, descriptors)
         img_from = vlc_db.get_image(key_from)
@@ -116,7 +143,14 @@ for key_from, key_to in putative_loop_closures:
         # keypoints = generate_keypoints(img_to.image)
         # descriptors = generate_descriptors(img_to.image)
         keypoints = np.zeros([1, 2])
-        descriptors = [img_to.embedding]
+        pose = uid_to_pose[key_to]
+        desc = VlcPose(
+            time_ns=img_to.metadata.epoch_ns,
+            position=pose[:3, 3],
+            rotation=R.from_matrix(pose[:3, :3]).as_quat(),
+        ).to_descriptor()
+        descriptors = [desc]
+        # descriptors = [img_to.embedding]
 
         vlc_db.update_keypoints(key_to, keypoints, descriptors)
         img_to = vlc_db.get_image(key_to)
@@ -133,11 +167,13 @@ for key_from, key_to in putative_loop_closures:
 
 
 # Plot estimated loop closures and ground truth trajectory
-positions = np.array([p[:3, 3] for p in uid_to_pose.values()])
+positions = np.array([p[:3, 3] for p in full_poses])
+rpy = np.array([R.from_matrix(p[:3, :3]).as_euler("xyz") for p in full_poses])
 
 plt.ion()
 plt.plot(positions[:, 0], positions[:, 1], color="k")
 plt.scatter(positions[:, 0], positions[:, 1], color="k")
+plot_heading(positions, rpy)
 
 
 for lc in vlc_db.iterate_lcs():
