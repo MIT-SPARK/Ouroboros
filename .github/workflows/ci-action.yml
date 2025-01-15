@@ -1,0 +1,22 @@
+name: Ouroboros CI
+run-name: Ouroboros CI
+on:
+    push:
+        branches: main
+    pull_request:
+        branches:
+            - main
+            - develop
+jobs:
+  Ouroboros-CI:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+            path: ouroboros_repo
+      - name: Install Ouroboros
+        run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
+      - name: Run test script
+        run: cd ${{ github.workspace }}/ouroboros_repo/tests && pytest
+      - run: echo "🍏 This job's status is ${{ job.status }}."

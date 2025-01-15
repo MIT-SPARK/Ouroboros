@@ -11,7 +11,12 @@ class InvertibleVectorStore:
         self._uuid_to_vector = {}
         self._local_idx_to_uuid = {}
 
+    def __contains__(self, key):
+        return key in self._uuid_to_vector
+
     def __getitem__(self, key):
+        if key not in self._uuid_to_vector:
+            raise IndexError()
         return self._uuid_to_vector[key]
 
     def __setitem__(self, key, newval):

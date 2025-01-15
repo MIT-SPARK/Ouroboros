@@ -19,10 +19,13 @@ class VlcImageTable:
 
     def get_image(self, image_uuid):
         if image_uuid not in self.metadata_store:
-            raise Exception(f"Image {image_uuid} not found in VLC DB!")
+            return None
         metadata = self.metadata_store[image_uuid]
         image = self.image_store[image_uuid]
-        embedding = self.embedding_store[image_uuid]
+        if image_uuid in self.embedding_store:
+            embedding = self.embedding_store[image_uuid]
+        else:
+            embedding = None
         keypoints = self.keypoints_store[image_uuid]
         descriptors = self.descriptors_store[image_uuid]
 

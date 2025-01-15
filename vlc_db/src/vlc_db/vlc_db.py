@@ -11,6 +11,10 @@ from vlc_db.vlc_session_table import SessionTable
 from vlc_db.spark_loop_closure import SparkLoopClosure
 
 
+class KeypointSizeException:
+    pass
+
+
 class VlcDb:
     def __init__(self, image_embedding_dimension):
         self._image_table = VlcImageTable(image_embedding_dimension)
@@ -26,7 +30,10 @@ class VlcDb:
         return self._image_table.add_image(session_id, image_timestamp, image)
 
     def get_image(self, image_uuid: str) -> VlcImage:
-        return self._image_table.get_image(image_uuid)
+        img = self._image_table.get_image(image_uuid)
+        if img is None:
+            raise KeyError("Image not in database")
+        return img
 
     def get_image_keys(self) -> [str]:
         return self._image_table.get_image_keys()
@@ -53,6 +60,9 @@ class VlcDb:
         self._image_table.update_embedding(image_uuid, embedding)
 
     def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
+        if descriptors is not None:
+            if len(keypoints) != len(descriptors):
+                raise KeypointSizeException()
         self._image_table.update_keypoints(
             image_uuid, keypoints, descriptors=descriptors
         )
@@ -68,9 +78,16 @@ class VlcDb:
         return self._session_table.add_session(robot_id, sensor_id, name)
 
     def insert_session(
-        self, robot_id: int, sensor_id: int = 0, name: str = None
-    ) -> str:
-        return self._session_table.insert_session(robot_id, sensor_id, name)
+        self,
+        session_uuid: str,
+        start_time: Union[int, datetime],
+        robot_id: int,
+        sensor_id: int = 0,
+        name: str = None,
+    ):
+        return self._session_table.insert_session(
+            session_uuid, start_time, robot_id, sensor_id, name
+        )
 
     def get_session(self, session_uuid: str):
         return self._session_table.get_session(session_uuid)
