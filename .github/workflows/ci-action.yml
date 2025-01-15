@@ -15,6 +15,10 @@ jobs:
         uses: actions/checkout@v4
         with:
             path: ouroboros_repo
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
       - name: Install Ouroboros
         run: cd ${{ github.workspace }}/ouroboros_repo/vlc_db && pwd && pip install .
       - name: Install Ouroboros Resources
