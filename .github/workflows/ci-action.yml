@@ -16,7 +16,7 @@ jobs:
         with:
             path: ouroboros_repo
       - name: Install Ouroboros
-        run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
+        run: cd ${{ github.workspace }}/ouroboros_repo/vlc_db && pwd && pip install .
       - name: Run test script
-        run: cd ${{ github.workspace }}/ouroboros_repo/tests && pytest
+        run: cd ${{ github.workspace }}/ouroboros_repo/vlc_db/tests && pytest
       - run: echo "🍏 This job's status is ${{ job.status }}."
