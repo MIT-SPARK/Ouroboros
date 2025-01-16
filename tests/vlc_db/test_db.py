@@ -1,27 +1,20 @@
+import time
+from datetime import datetime
+
+import numpy as np
 import pytest
 
-
-from importlib_resources import files
-import vlc_resources
-from vlc_db.vlc_db import VlcDb
-from vlc_db.spark_loop_closure import SparkLoopClosure
 from vlc_db.spark_image import SparkImage
-from datetime import datetime
-import time
-
-import imageio.v2 as imageio
-import numpy as np
+from vlc_db.spark_loop_closure import SparkLoopClosure
+from vlc_db.vlc_db import VlcDb
 
 
-def test_add_image():
+def test_add_image(image_factory):
     vlc_db = VlcDb(3)
     session_id = vlc_db.add_session(0)
 
-    fn_a = files(vlc_resources).joinpath("arch.jpg")
-    img_a = imageio.imread(fn_a)
-
-    fn_b = files(vlc_resources).joinpath("left_img_0.png")
-    img_b = imageio.imread(fn_b)
+    img_a = image_factory("arch.jpg")
+    img_b = image_factory("left_img_0.png")
 
     key_a = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=img_a))
     key_b = vlc_db.add_image(session_id, time.time() * 1e9, SparkImage(rgb=img_b))

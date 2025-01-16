@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest]
+testpaths = "tests"
+addopts = ["--cov-report=term-missing"]
+
+[tool.tox]
+requires = ["tox>=4"]
+skip_missing_interpreters = true
+env_list = ["type", "3.8", "3.9", "3.10"]
+
+[tool.tox.env_run_base]
+description = "run unit tests"
+deps = [
+    "pytest>=8",
+    "pytest-sugar",
+    "pytest-cov",
+]
+commands = [["pytest", "--cov={envsitepackagesdir}/vlc_db", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]
