@@ -49,12 +49,10 @@ def resource_dir() -> pathlib.Path:
 def image_factory():
     """Get images from resource directory."""
     resource_path = _resource_dir()
-    print(resource_path)
 
     def factory(name):
         """Get image."""
         img_path = resource_path / name
-        print(img_path)
         img = iio.imread(img_path)
         assert img is not None
         return img
