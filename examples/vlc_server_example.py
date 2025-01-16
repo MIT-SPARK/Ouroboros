@@ -1,17 +1,22 @@
-from importlib_resources import files
-import vlc_resources
-from vlc_db.vlc_db import VlcDb
-from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.spark_image import SparkImage
+import pathlib
 from datetime import datetime
 
-import imageio.v2 as imageio
+import imageio.v3 as iio
 import numpy as np
+
+from vlc_db.spark_image import SparkImage
+from vlc_db.spark_loop_closure import SparkLoopClosure
+from vlc_db.vlc_db import VlcDb
 
 vlc_db = VlcDb(3)
 
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
+
+
+def load_resource_image(image_name):
+    resource_path = pathlib.Path(__file__).absolute().parent.parent / "resources"
+    return iio.imread(resource_path / image_name)
 
 
 def insert_image(db, image):
@@ -26,19 +31,10 @@ def insert_image(db, image):
     return uid
 
 
-fn_a = files(vlc_resources).joinpath("left_img_0.png")
-img_a = imageio.imread(fn_a)
-
-
-fn_b = files(vlc_resources).joinpath("left_img_1.png")
-img_b = imageio.imread(fn_b)
-
-fn_c = files(vlc_resources).joinpath("right_img_1.png")
-img_c = imageio.imread(fn_c)
-
-fn_d = files(vlc_resources).joinpath("arch.jpg")
-img_d = imageio.imread(fn_d)
-
+img_a = load_resource_image("left_img_0.png")
+img_b = load_resource_image("left_img_1.png")
+img_c = load_resource_image("right_img_1.png")
+img_d = load_resource_image("arch.jpg")
 
 a_id = insert_image(vlc_db, img_a)
 vlc_db.update_embedding(a_id, np.array([1, 0, 0]))
