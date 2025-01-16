@@ -1,13 +1,16 @@
+import pathlib
+
+import imageio.v3 as iio
+import numpy as np
 import torch
 import torchvision.transforms as T
-import numpy as np
-
-from importlib_resources import files
-import vlc_resources
-import imageio.v2 as imageio
 import tqdm
 
 torch.backends.cudnn.benchmark = True
+
+
+def resource_dir():
+    return pathlib.Path(__file__).absolute().parent.parent / "resources"
 
 
 def get_salad_model():
@@ -53,7 +56,6 @@ def get_descriptors(model, dataloader, device):
 
 if __name__ == "__main__":
     model = get_salad_model()
-    fn_d = files(vlc_resources).joinpath("arch.jpg")
-    img_d = imageio.imread(fn_d)
+    img_d = iio.imread(resource_dir() / "arch.jpg")
 
     out = model(img_d)

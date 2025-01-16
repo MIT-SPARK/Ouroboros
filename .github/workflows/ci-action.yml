@@ -23,9 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Ouroboros
-        run: cd ${{ github.workspace }}/ouroboros_repo/vlc_db && pwd && pip install .
-      - name: Install Ouroboros Resources
-        run: cd ${{ github.workspace }}/ouroboros_repo/vlc_resources && pwd && pip install .
+        run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
       - name: Run test script
-        run: cd ${{ github.workspace }}/ouroboros_repo/vlc_db/tests && pytest
+        run: cd ${{ github.workspace }}/ouroboros_repo && pytest
       - run: echo "🍏 This job's status is ${{ job.status }}."

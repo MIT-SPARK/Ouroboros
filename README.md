@@ -2,7 +2,7 @@
 
 ## Installation
 
-pip install from inside `vlc_db` and again from `vlc_resources`. I guess we should have both packages installed by the same setup.py eventually.
+pip install from the top-level directory. I guess we should have both packages installed by the same setup.py eventually.
 
 See the example in `examples` to get an idea of how to use the interface so far.
 
