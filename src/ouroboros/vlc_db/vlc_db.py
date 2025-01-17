@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Union
+from typing import Union, Callable, TypeVar
 import numpy as np
 
 from ouroboros.vlc_db.spark_image import SparkImage
@@ -9,10 +9,14 @@ from ouroboros.vlc_db.vlc_image_table import VlcImageTable
 from ouroboros.vlc_db.vlc_lc_table import LcTable
 from ouroboros.vlc_db.vlc_session_table import SessionTable
 from ouroboros.vlc_db.spark_loop_closure import SparkLoopClosure
+from ouroboros.vlc_db.utils import epoch_ns_from_datetime
 
 
 class KeypointSizeException:
     pass
+
+
+T = TypeVar("T")
 
 
 class VlcDb:
@@ -44,6 +48,25 @@ class VlcDb:
 
     def query_embeddings(
         self,
+        embedding: np.ndarray,
+        k: int,
+        similarity_metric: Union[str, callable] = "ip",
+    ) -> ([VlcImage], [float]):
+        """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
+        Queries for the top k matches.
+
+        Returns the top k closest matches and the match distances
+        """
+
+        assert embedding.ndim == 1, "Query embedding must be 1d vector"
+
+        matches, similarities = self.batch_query_embeddings(
+            np.array([embedding]), k, similarity_metric
+        )
+        return matches[0], similarities[0]
+
+    def batch_query_embeddings(
+        self,
         embeddings: np.ndarray,
         k: int,
         similarity_metric: Union[str, callable] = "ip",
@@ -54,7 +77,93 @@ class VlcDb:
         Returns the top k closest matches and the match distances
         """
 
+        assert (
+            embeddings.ndim == 2
+        ), "Batch query requires an NxD array of query embeddings"
+
         return self._image_table.query_embeddings(embeddings, k, similarity_metric)
+
+    def query_embeddings_max_time(
+        self,
+        embedding: np.ndarray,
+        k: int,
+        max_time: Union[float, int, datetime],
+        similarity_metric: Union[str, callable] = "ip",
+    ) -> ([VlcImage], [float]):
+        """Query image embeddings to find the k closest vectors with timestamp older than max_time."""
+
+        if isinstance(max_time, datetime):
+            max_time = epoch_ns_from_datetime(max_time)
+        # NOTE: This is a placeholder implementation. Ideally, we re-implement
+        # this to be more efficient and not iterate through the full set of
+        # vectors
+
+        def time_filter(_, vlc_image, similarity):
+            return vlc_image.metadata.epoch_ns < max_time
+
+        matches, similarities = self.batch_query_embeddings_filter(
+            self, np.array([embedding]), k, time_filter
+        )
+        return matches[0], similarities[0]
+
+    def batch_query_embeddings_uuid_filter(
+        self,
+        uuids: [str],
+        k: int,
+        filter_function: Callable[[VlcImage, VlcImage, float], bool],
+        similarity_metric: Union[str, callable] = "ip",
+    ):
+        # get image for each uuid and call query_embeddings)filter
+
+        embeddings = np.array([self.get_image(u) for u in uuids])
+        images = [self.get_image(u) for u in uuids]
+        return self.batch_query_embeddings_filter(
+            embeddings, k, filter_function, similarity_metric, filter_metadata=images
+        )
+
+    def batch_query_embeddings_filter(
+        self,
+        embeddings: np.ndarray,
+        k: int,
+        filter_function: Callable[[T, VlcImage, float], bool],
+        similarity_metric: Union[str, callable] = "ip",
+        filter_metadata: [T] = None,
+    ):
+        """Query image embeddings to find the k closest vectors that satisfy
+        the filter function. Note that this query may be much slower than
+        `query_embeddings_with_max_time` because it requires iterating over all
+        stored images.
+        """
+
+        assert filter_metadata is None or len(filter_metadata) == len(embeddings)
+        if filter_metadata is None:
+            filter_metadata = [None] * len(embeddings)
+
+        matches, similarities = self.batch_query_embeddings(
+            embeddings, -1, similarity_metric="ip"
+        )
+
+        filtered_matches_out = []
+        for metadata, matches_for_query, similarities_for_query in zip(
+            filter_metadata, matches, similarities
+        ):
+            filtered_matches_for_query = []
+            n_matches = 0
+            for match_image, similarity in zip(
+                matches_for_query, similarities_for_query
+            ):
+                if filter_function(filter_metadata, match_image, similarity):
+                    filtered_matches_for_query.append(
+                        (filter_metadata, match_image, similarity)
+                    )
+                    n_matches += 1
+
+                if n_matches >= k:
+                    break
+
+            filtered_matches_out.append(filtered_matches_for_query)
+
+        return filtered_matches_out
 
     def update_embedding(self, image_uuid: str, embedding):
         self._image_table.update_embedding(image_uuid, embedding)
