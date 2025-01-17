@@ -51,7 +51,7 @@ print("Print: vlc_db.image_table.get_image[a_id]:")
 print(vlc_db.get_image(a_id))
 
 print("Querying 0,1,1")
-imgs, dists = vlc_db.query_embeddings(np.array([[0, 1, 1]]), 2)
+imgs, dists = vlc_db.query_embeddings(np.array([0, 1, 1]), 2)
 
 computed_ts = datetime.now()
 loop_closure = ob.SparkLoopClosure(
