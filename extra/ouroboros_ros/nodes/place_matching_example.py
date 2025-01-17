@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import rospy
 
 from dynamic_reconfigure.server import Server
@@ -7,7 +8,7 @@ import cv_bridge
 import numpy as np
 
 from ouroboros import VlcDb, SparkImage
-from ouroboros_salad import get_salad_model
+from ouroboros_salad.salad_model import get_salad_model
 from ouroboros_ros.cfg import PlaceDescriptorDebuggingConfig
 
 
@@ -62,17 +63,19 @@ class PlaceDescriptorExample:
         embedding = self.embedding_model(image)
 
         image_matches, similarities = self.vlc_db.query_embeddings_max_time(
-            embedding, 1, msg.header.stamp.to_nsec() - self.lc_lockout
+            embedding, 1, msg.header.stamp.to_nsec() - self.lc_lockout * 1e9
         )
 
         self.vlc_db.update_embedding(uid, embedding)
 
-        if similarities[0] < self.place_match_threshold:
-            image_match = None
+        if len(similarities) == 0 or similarities[0] < self.place_match_threshold:
+            right = None
         else:
-            image_match = image_matches[0]
+            right = image_matches[0].image.rgb
 
-        display_image_pair(current_image, image_match)
+        left = current_image.image.rgb
+
+        display_image_pair(left, right)
 
 
 if __name__ == "__main__":
