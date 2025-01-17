@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from vlc_db.spark_image import SparkImage
+from ouroboros.vlc_db.spark_image import SparkImage
 
 
 @dataclass
