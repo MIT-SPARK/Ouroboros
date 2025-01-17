@@ -31,6 +31,7 @@ class VlcDb:
         image_timestamp: Union[int, datetime],
         image: SparkImage,
     ) -> str:
+        """image_timestamp should be a datetime object or integer number of nanoseconds"""
         return self._image_table.add_image(session_id, image_timestamp, image)
 
     def get_image(self, image_uuid: str) -> VlcImage:

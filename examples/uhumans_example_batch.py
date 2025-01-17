@@ -2,7 +2,6 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-from salad_example import get_salad_model
 from scipy.spatial.transform import Rotation as R
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
@@ -11,6 +10,7 @@ from ouroboros.vlc_db.gt_lc_utils import (
     VlcPose,
     recover_pose,
 )
+from ouroboros_salad import get_salad_model
 
 
 def plot_heading(positions, rpy):
