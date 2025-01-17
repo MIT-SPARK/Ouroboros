@@ -1,7 +1,10 @@
 import time
 import uuid
 
-from vlc_db.spark_loop_closure import SparkLoopClosure, SparkLoopClosureMetadata
+from ouroboros.vlc_db.spark_loop_closure import (
+    SparkLoopClosure,
+    SparkLoopClosureMetadata,
+)
 
 
 class LcTable:

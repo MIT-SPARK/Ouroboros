@@ -1,9 +1,9 @@
 import uuid
-from typing import Union
 from datetime import datetime
+from typing import Union
 
-from vlc_db.spark_session import SparkSession
-from vlc_db.utils import epoch_ns_from_datetime
+from ouroboros.vlc_db.spark_session import SparkSession
+from ouroboros.vlc_db.utils import epoch_ns_from_datetime
 
 
 class SessionTable:

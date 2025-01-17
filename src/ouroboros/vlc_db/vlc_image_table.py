@@ -3,10 +3,10 @@ from typing import Union
 import uuid
 import numpy as np
 
-from vlc_db.spark_image import SparkImage
-from vlc_db.vlc_image import VlcImage, VlcImageMetadata
-from vlc_db.invertible_vector_store import InvertibleVectorStore
-from vlc_db.utils import epoch_ns_from_datetime
+from ouroboros.vlc_db.spark_image import SparkImage
+from ouroboros.vlc_db.vlc_image import VlcImage, VlcImageMetadata
+from ouroboros.vlc_db.invertible_vector_store import InvertibleVectorStore
+from ouroboros.vlc_db.utils import epoch_ns_from_datetime
 
 
 class VlcImageTable:

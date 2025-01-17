@@ -4,20 +4,18 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from vlc_db.spark_image import SparkImage
-from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.vlc_db import VlcDb
+import ouroboros as ob
 
 
 def test_add_image(image_factory):
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     img_a = image_factory("arch.jpg")
     img_b = image_factory("left_img_0.png")
 
-    key_a = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=img_a))
-    key_b = vlc_db.add_image(session_id, time.time() * 1e9, SparkImage(rgb=img_b))
+    key_a = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=img_a))
+    key_b = vlc_db.add_image(session_id, time.time() * 1e9, ob.SparkImage(rgb=img_b))
 
     assert key_a != key_b, "Image UUIDs not unique"
 
@@ -34,7 +32,7 @@ def test_add_image(image_factory):
 
 
 def test_iterate_image():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
     for _ in range(10):
         t_rand = int(np.random.random() * 1e9)
@@ -48,7 +46,7 @@ def test_iterate_image():
 
 
 def test_get_image_keys():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
     for _ in range(10):
         t_rand = int(np.random.random() * 1e9)
@@ -62,7 +60,7 @@ def test_get_image_keys():
 
 
 def test_query_embedding():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     a_id = vlc_db.add_image(session_id, datetime.now(), None)
@@ -123,7 +121,7 @@ def test_query_embedding():
 
 
 def test_query_embedding_custom_similarity():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     a_id = vlc_db.add_image(session_id, datetime.now(), None)
@@ -148,7 +146,7 @@ def test_query_embedding_custom_similarity():
 
 
 def test_update_keypoints():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     a_id = vlc_db.add_image(session_id, datetime.now(), None)
@@ -168,7 +166,7 @@ def test_update_keypoints():
 
 
 def test_add_session():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     robot_id = 0
     sensor_id = 42
     session_id = vlc_db.add_session(robot_id, sensor_id, "session_name")
@@ -181,7 +179,7 @@ def test_add_session():
 
 
 def test_insert_session():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = 1234
     robot_id = 0
     sensor_id = 42
@@ -197,11 +195,11 @@ def test_insert_session():
 
 
 def test_add_lc():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     computed_ts = datetime.now()
-    loop_closure = SparkLoopClosure(
+    loop_closure = ob.SparkLoopClosure(
         from_image_uuid=0,
         to_image_uuid=1,
         f_T_t=np.eye(4),
@@ -218,11 +216,11 @@ def test_add_lc():
 
 
 def test_iterate_lcs():
-    vlc_db = VlcDb(3)
+    vlc_db = ob.VlcDb(3)
     session_id = vlc_db.add_session(0)
 
     computed_ts = datetime.now()
-    loop_closure = SparkLoopClosure(
+    loop_closure = ob.SparkLoopClosure(
         from_image_uuid=0,
         to_image_uuid=1,
         f_T_t=np.eye(4),
@@ -230,7 +228,7 @@ def test_iterate_lcs():
     )
     lc_uuid_1 = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts)
     computed_ts_2 = datetime.now()
-    loop_closure = SparkLoopClosure(
+    loop_closure = ob.SparkLoopClosure(
         from_image_uuid=3,
         to_image_uuid=4,
         f_T_t=np.eye(4),

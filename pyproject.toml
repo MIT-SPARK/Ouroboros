@@ -21,4 +21,4 @@ deps = [
     "pytest-sugar",
     "pytest-cov",
 ]
-commands = [["pytest", "--cov={envsitepackagesdir}/vlc_db", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]
+commands = [["pytest", "--cov={envsitepackagesdir}/ouroboros", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]

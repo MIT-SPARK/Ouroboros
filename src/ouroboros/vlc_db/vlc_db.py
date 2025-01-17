@@ -2,13 +2,13 @@ from datetime import datetime
 from typing import Union
 import numpy as np
 
-from vlc_db.spark_image import SparkImage
-from vlc_db.vlc_image import VlcImage
+from ouroboros.vlc_db.spark_image import SparkImage
+from ouroboros.vlc_db.vlc_image import VlcImage
 
-from vlc_db.vlc_image_table import VlcImageTable
-from vlc_db.vlc_lc_table import LcTable
-from vlc_db.vlc_session_table import SessionTable
-from vlc_db.spark_loop_closure import SparkLoopClosure
+from ouroboros.vlc_db.vlc_image_table import VlcImageTable
+from ouroboros.vlc_db.vlc_lc_table import LcTable
+from ouroboros.vlc_db.vlc_session_table import SessionTable
+from ouroboros.vlc_db.spark_loop_closure import SparkLoopClosure
 
 
 class KeypointSizeException:
