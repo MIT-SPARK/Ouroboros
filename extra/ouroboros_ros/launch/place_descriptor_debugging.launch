@@ -1,0 +1,5 @@
+<launch>
+  <remap from="~image_in" to="/tesse/left_cam/rgb/image_raw"/>
+  <node pkg="ouroboros_ros" type="place_matching_example.py" name="place_matching_example" required="true" output="screen" >
+  </node>
+</launch>

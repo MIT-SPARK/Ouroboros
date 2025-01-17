@@ -3,9 +3,8 @@ from datetime import datetime
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from salad_example import get_salad_model
+from ouroboros_salad.salad_model import get_salad_model
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
-from tqdm import tqdm
 
 import ouroboros as ob
 
