@@ -1,25 +1,20 @@
 #!/usr/bin/env python3
 import functools
-import rospy
-import numpy as np
+
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import rospy
+import tf2_ros
+from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
 from scipy.spatial.transform import Rotation as R
 
-import matplotlib.pyplot as plt
-
-from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
-
-import tf2_ros
-
-
-from vlc_db.vlc_db import VlcDb
-from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.gt_lc_utils import (
+import ouroboros as ob
+from ouroboros.vlc_db.gt_lc_utils import (
     VlcPose,
     compute_descriptor_similarity,
     recover_pose,
 )
-
 
 # Hydra takes too long to add agent poses to the backend, so if we send the LC
 # immediately it will get rejected. To work around this, we can't send the loop
@@ -127,7 +122,7 @@ def compute_lc(
     match_kps, match_descriptors = vlc_db.get_keypoints(match_uid)
 
     from_T_to = recover_pose(query_descriptors, match_descriptors)
-    lc = SparkLoopClosure(
+    lc = ob.SparkLoopClosure(
         from_image_uuid=0, to_image_uuid=0, f_T_t=from_T_to, quality=1
     )
     vlc_db.add_lc(lc, session_id)
@@ -193,7 +188,7 @@ if __name__ == "__main__":
         line = plt.plot([], [], color="g")[0]
         points = plt.scatter([], [], color="g")
 
-    vlc_db = VlcDb(8)
+    vlc_db = ob.VlcDb(8)
     session_id = vlc_db.add_session(0)
 
     rate = rospy.Rate(10)
