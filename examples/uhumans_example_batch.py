@@ -79,45 +79,27 @@ with loader:
 # Query for closest matches
 query_embeddings = np.array([image.embedding for image in vlc_db.iterate_images()])
 
-# query_fn = functools.partial(
-#    compute_descriptor_similarity, lc_lockout * 1e9, gt_lc_max_dist
-# )
 
-# matches, similarities = vlc_db.query_embeddings(
-#    np.array(query_embeddings), 1, similarity_metric=query_fn
-# )
-
-
-matches, similarities = vlc_db.query_embeddings(
-    query_embeddings, -1, similarity_metric="ip"
+matches = vlc_db.batch_query_embeddings_uuid_filter(
+    vlc_db.get_image_keys(),
+    1,
+    lambda q, v, s: q.metadata.epoch_ns > v.metadata.epoch_ns + lc_lockout * 1e9,
 )
 
-
-# TODO: move this to db query or utility function
-# Ignore matches that are too close temporally or too far in descriptor similarity
 putative_loop_closures = []
-for key, matches_for_query, similarities_for_query in zip(
-    vlc_db.get_image_keys(), matches, similarities
-):
-    ts = vlc_db.get_image(key).metadata.epoch_ns
-    match_uuid = None
-    for match_image, similarity in zip(matches_for_query, similarities_for_query):
-        match_ts = match_image.metadata.epoch_ns
-        if abs(match_ts - ts) > lc_lockout * 1e9 and ts > match_ts:
-            match_uuid = match_image.metadata.image_uuid
-            break
-
-        if similarity < place_recognition_threshold:
-            break
-
-    if match_uuid is None:
+for matches_to_frame in matches:
+    if len(matches_to_frame) == 0:
         continue
+    similarity = matches_to_frame[0][0]
+    if similarity < place_recognition_threshold:
+        continue
+    putative_loop_closures.append((matches_to_frame[0][1], matches_to_frame[0][2]))
 
-    putative_loop_closures.append((key, match_uuid))
 
 # Recover poses from matching loop closures
-for key_from, key_to in putative_loop_closures:
-    img_from = vlc_db.get_image(key_from)
+for img_from, img_to in putative_loop_closures:
+    key_from = img_from.metadata.image_uuid
+    key_to = img_to.metadata.image_uuid
     if img_from.keypoints is None or img_from.descriptors is None:
         # TODO: replace with real keypoints and descriptors
         # keypoints = generate_keypoints(img_from.image)
@@ -135,7 +117,6 @@ for key_from, key_to in putative_loop_closures:
         vlc_db.update_keypoints(key_from, keypoints, descriptors)
         img_from = vlc_db.get_image(key_from)
 
-    img_to = vlc_db.get_image(key_to)
     if img_to.keypoints is None or img_to.descriptors is None:
         # TODO: replace with real keypoints and descriptors
         # keypoints = generate_keypoints(img_to.image)

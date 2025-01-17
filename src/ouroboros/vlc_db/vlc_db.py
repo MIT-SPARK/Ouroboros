@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Union, Callable, TypeVar
+from typing import Union, Callable, TypeVar, Tuple, List, Optional
 import numpy as np
 
 from ouroboros.vlc_db.spark_image import SparkImage
@@ -65,23 +65,22 @@ class VlcDb:
         )
         return matches[0], similarities[0]
 
-    def batch_query_embeddings(
+    def query_embeddings_filter(
         self,
-        embeddings: np.ndarray,
+        embedding: np.ndarray,
         k: int,
+        filter_function: Callable[[VlcImage, float], bool],
         similarity_metric: Union[str, callable] = "ip",
-    ) -> ([[VlcImage]], [[float]]):
-        """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
-        Queries for the top k matches.
+    ):
+        ret = self.batch_query_embeddings_filter(
+            np.array([embedding]),
+            k,
+            lambda _, img, sim: filter_function(img, sim),
+            similarity_metric,
+        )
 
-        Returns the top k closest matches and the match distances
-        """
-
-        assert (
-            embeddings.ndim == 2
-        ), "Batch query requires an NxD array of query embeddings"
-
-        return self._image_table.query_embeddings(embeddings, k, similarity_metric)
+        return_matches = [(t[0], t[2]) for t in ret[0]]
+        return return_matches
 
     def query_embeddings_max_time(
         self,
@@ -101,10 +100,10 @@ class VlcDb:
         def time_filter(_, vlc_image, similarity):
             return vlc_image.metadata.epoch_ns < max_time
 
-        matches, similarities = self.batch_query_embeddings_filter(
-            self, np.array([embedding]), k, time_filter
-        )
-        return matches[0], similarities[0]
+        ret = self.batch_query_embeddings_filter(np.array([embedding]), k, time_filter)
+        matches = [t[2] for t in ret[0]]
+        similarities = [t[0] for t in ret[0]]
+        return matches, similarities
 
     def batch_query_embeddings_uuid_filter(
         self,
@@ -115,11 +114,29 @@ class VlcDb:
     ):
         # get image for each uuid and call query_embeddings)filter
 
-        embeddings = np.array([self.get_image(u) for u in uuids])
+        embeddings = np.array([self.get_image(u).embedding for u in uuids])
         images = [self.get_image(u) for u in uuids]
         return self.batch_query_embeddings_filter(
             embeddings, k, filter_function, similarity_metric, filter_metadata=images
         )
+
+    def batch_query_embeddings(
+        self,
+        embeddings: np.ndarray,
+        k: int,
+        similarity_metric: Union[str, callable] = "ip",
+    ) -> ([[VlcImage]], [[float]]):
+        """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
+        Queries for the top k matches.
+
+        Returns the top k closest matches and the match distances
+        """
+
+        assert (
+            embeddings.ndim == 2
+        ), f"Batch query requires an NxD array of query embeddings, not {embeddings.shape}"
+
+        return self._image_table.query_embeddings(embeddings, k, similarity_metric)
 
     def batch_query_embeddings_filter(
         self,
@@ -127,17 +144,22 @@ class VlcDb:
         k: int,
         filter_function: Callable[[T, VlcImage, float], bool],
         similarity_metric: Union[str, callable] = "ip",
-        filter_metadata: [T] = None,
-    ):
+        filter_metadata: Optional[Union[T, List[T]]] = None,
+    ) -> [[Tuple[float, T, VlcImage]]]:
         """Query image embeddings to find the k closest vectors that satisfy
         the filter function. Note that this query may be much slower than
         `query_embeddings_with_max_time` because it requires iterating over all
         stored images.
         """
 
-        assert filter_metadata is None or len(filter_metadata) == len(embeddings)
-        if filter_metadata is None:
+        if isinstance(filter_metadata, list):
+            assert len(filter_metadata) == len(embeddings)
+        elif filter_metadata is None:
             filter_metadata = [None] * len(embeddings)
+        elif callable(filter_metadata):
+            filter_metadata = [filter_metadata] * len(embeddings)
+        else:
+            raise Exception("filter function must be a list, callable, or None")
 
         matches, similarities = self.batch_query_embeddings(
             embeddings, -1, similarity_metric="ip"
@@ -152,9 +174,9 @@ class VlcDb:
             for match_image, similarity in zip(
                 matches_for_query, similarities_for_query
             ):
-                if filter_function(filter_metadata, match_image, similarity):
+                if filter_function(metadata, match_image, similarity):
                     filtered_matches_for_query.append(
-                        (filter_metadata, match_image, similarity)
+                        (similarity, metadata, match_image)
                     )
                     n_matches += 1
 

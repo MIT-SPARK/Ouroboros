@@ -67,41 +67,22 @@ with loader:
         uid_to_pose[uid] = pose.matrix()
 
 
-# Query for closest matches
-query_embeddings = np.array([image.embedding for image in vlc_db.iterate_images()])
-
-matches, similarities = vlc_db.query_embeddings(
-    query_embeddings, -1, similarity_metric="ip"
-)
-
-
-# TODO: move this to db query or utility function
-# Ignore matches that are too close temporally or too far in descriptor similarity
 times = []
 closest = []
-putative_loop_closures = []
-for key, matches_for_query, similarities_for_query in tqdm(
-    zip(vlc_db.get_image_keys(), matches, similarities), total=len(matches)
-):
-    ts = vlc_db.get_image(key).metadata.epoch_ns
-    match_uuid = None
-    for match_image, similarity in zip(matches_for_query, similarities_for_query):
-        match_ts = match_image.metadata.epoch_ns
-        if abs(match_ts - ts) > lc_lockout * 1e9:
-            match_uuid = match_image.metadata.image_uuid
-            break
-
+for img in vlc_db.iterate_images():
+    ts = img.metadata.epoch_ns
+    matches = vlc_db.query_embeddings_filter(
+        img.embedding, 1, lambda m, s: abs(m.metadata.epoch_ns - ts) > lc_lockout * 1e9
+    )
     times.append(ts / 1e9)
-    closest.append(similarity)
-
-    if similarity < place_recognition_threshold:
-        match_uuid = None
-
-    if match_uuid is None:
-        putative_loop_closures.append((key, None))
-        continue
-
-    putative_loop_closures.append((key, match_uuid))
+    closest.append(matches[0][0])
+    if matches[0][0] > place_recognition_threshold:
+        right = matches[0][1].image.rgb
+    else:
+        right = None
+    img = combine_images(img.image.rgb, right)
+    cv2.imshow("matches", img.astype(np.uint8))
+    cv2.waitKey(30)
 
 t = [ti - times[0] for ti in times]
 plt.ion()
@@ -109,12 +90,3 @@ plt.plot(t, closest)
 plt.xlabel("Time (s)")
 plt.ylabel("Best Descriptor Similarity")
 plt.title("Closest Descriptor s.t. Time Constraint")
-for key, match_key in tqdm(putative_loop_closures):
-    left = vlc_db.get_image(key).image.rgb
-    if match_key is None:
-        right = np.zeros(left.shape)
-    else:
-        right = vlc_db.get_image(match_key).image.rgb
-    img = combine_images(left, right)
-    cv2.imshow("matches", img.astype(np.uint8))
-    cv2.waitKey(30)

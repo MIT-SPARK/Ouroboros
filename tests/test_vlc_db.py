@@ -75,49 +75,22 @@ def test_query_embedding():
     d_id = vlc_db.add_image(session_id, datetime.now(), None)
     vlc_db.update_embedding(d_id, np.array([0, 0, 1]))
 
-    imgs, dists = vlc_db.query_embeddings(np.array([[0, 0.2, 0.8]]), 1)
-    assert len(imgs) == 1, "number of results differs from number of query vectors"
-    assert (
-        len(imgs[0]) == 1
-    ), "query_embeddings returned wrong number of closest matches"
-    assert imgs[0][0].metadata.image_uuid in [a_id, d_id]
+    imgs, sims = vlc_db.query_embeddings(np.array([0, 0.2, 0.8]), 1)
+    assert len(imgs) == 1, "query_embeddings returned wrong number of closest matches"
+    assert imgs[0].metadata.image_uuid in [a_id, d_id]
 
-    imgs, dists = vlc_db.query_embeddings(np.array([[0, 0.2, 0.8]]), 2)
-    assert len(imgs[0]) == 2, "query_embeddings returned wrong number of matches"
-    match_ids = []
-    for img in imgs[0]:
-        match_ids.append(img.metadata.image_uuid)
-        assert img.metadata.image_uuid in [
-            a_id,
-            d_id,
-        ], "Query matched to vector other than k closest"
+    imgs, sims = vlc_db.query_embeddings(np.array([0, 0.2, 0.8]), 2)
+    assert len(imgs) == 2, "query_embeddings returned wrong number of matches"
+    assert set((a_id, d_id)) == set(
+        [img.metadata.image_uuid for img in imgs]
+    ), "Query did not match k closest"
 
-    for img_id in [a_id, d_id]:
-        assert img_id in match_ids, "Query didn't match to all of k closest"
+    imgs, sims = vlc_db.query_embeddings(np.array([0, 0.2, 0.8]), 3)
+    assert len(imgs) == 3, "query_embeddings returned wrong number of matches"
 
-    imgs, dists = vlc_db.query_embeddings(np.array([[0, 0.2, 0.8]]), 3)
-    assert len(imgs[0]) == 3, "query_embeddings returned wrong number of matches"
-    match_ids = []
-    for img in imgs[0]:
-        match_ids.append(img.metadata.image_uuid)
-        assert img.metadata.image_uuid in [
-            a_id,
-            c_id,
-            d_id,
-        ], "Query matched to vector other than k closest"
-
-    for img_id in [a_id, c_id, d_id]:
-        assert img_id in match_ids, "Query didn't match to all of k closest"
-
-    imgs, dists = vlc_db.query_embeddings(np.array([[0, 1, 0], [0, 0.2, 0.2]]), 1)
-    assert len(imgs) == 2, "number of results different from number of query vectors"
-    assert len(imgs[0]) == 1, "returned wrong number of matches for vector"
-    assert (
-        imgs[0][0].metadata.image_uuid == b_id
-    ), "Did not match correct image embedding"
-    assert (
-        imgs[1][0].metadata.image_uuid == c_id
-    ), "Did not match correct image embedding"
+    assert set((a_id, c_id, d_id)) == set(
+        [img.metadata.image_uuid for img in imgs]
+    ), "Query did not match k closest"
 
 
 def test_query_embedding_custom_similarity():
@@ -136,13 +109,191 @@ def test_query_embedding_custom_similarity():
     def radius_metric(x, y):
         return -abs(np.linalg.norm(x) - np.linalg.norm(y))
 
-    imgs, dists = vlc_db.query_embeddings(
-        np.array([[2, 0, 0]]), 1, similarity_metric=radius_metric
+    imgs, sims = vlc_db.query_embeddings(
+        np.array([2, 0, 0]), 1, similarity_metric=radius_metric
     )
 
+    assert imgs[0].metadata.image_uuid == b_id, "custom similarity matched wrong vector"
+
+
+def test_query_embeddings_max_time():
+    vlc_db = ob.VlcDb(3)
+    session_id = vlc_db.add_session(0)
+
+    a_id = vlc_db.add_image(session_id, 0, None)
+    vlc_db.update_embedding(a_id, np.array([0, 0, 0.9]))
+
+    b_id = vlc_db.add_image(session_id, 10, None)
+    vlc_db.update_embedding(b_id, np.array([0, 1, 0]))
+
+    c_id = vlc_db.add_image(session_id, 20, None)
+    vlc_db.update_embedding(c_id, np.array([0, 0, 1]))
+
+    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 1, 15)
+
+    assert imgs[0].metadata.image_uuid == a_id
+
+    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 2, 15)
+
+    assert imgs[0].metadata.image_uuid == a_id
+    assert imgs[1].metadata.image_uuid == b_id
+
+    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 3, 15)
+
+    assert len(imgs) == 2
+
+
+def test_batch_query_embeddings():
+    vlc_db = ob.VlcDb(3)
+    session_id = vlc_db.add_session(0)
+
+    a_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(a_id, np.array([0, 0, 1]))
+
+    b_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(b_id, np.array([0, 1, 0]))
+
+    c_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(c_id, np.array([0, 1 / np.sqrt(2), 1 / np.sqrt(2)]))
+
+    d_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(d_id, np.array([0, 0, 1]))
+
+    imgs, sims = vlc_db.batch_query_embeddings(np.array([[0, 1, 0], [0, 0.2, 0.2]]), 1)
+    assert len(imgs) == 2, "number of results different from number of query vectors"
+    assert len(imgs[0]) == 1, "returned wrong number of matches for vector"
     assert (
         imgs[0][0].metadata.image_uuid == b_id
-    ), "custom similarity matched wrong vector"
+    ), "Did not match correct image embedding"
+    assert (
+        imgs[1][0].metadata.image_uuid == c_id
+    ), "Did not match correct image embedding"
+
+
+def test_batch_query_embeddings_uuid_filter():
+    vlc_db = ob.VlcDb(3)
+    session_id = vlc_db.add_session(0)
+
+    a_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(a_id, np.array([0, 0, 1]))
+
+    b_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(b_id, np.array([0, 1, 0]))
+
+    c_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(c_id, np.array([0, 1 / np.sqrt(2), 1 / np.sqrt(2)]))
+
+    d_id = vlc_db.add_image(session_id, datetime.now(), None)
+    vlc_db.update_embedding(d_id, np.array([0, 0, 0.9]))
+
+    matches = vlc_db.batch_query_embeddings_uuid_filter(
+        [a_id, b_id], 1, lambda q, v, s: True
+    )
+
+    assert len(matches) == 2
+    assert len(matches[0]) == 1
+    assert len(matches[1]) == 1
+
+    assert matches[0][0][1].metadata.image_uuid == a_id
+    assert matches[0][0][2].metadata.image_uuid == a_id
+
+    assert matches[1][0][1].metadata.image_uuid == b_id
+    assert matches[1][0][2].metadata.image_uuid == b_id
+
+    matches = vlc_db.batch_query_embeddings_uuid_filter(
+        [a_id, b_id], 1, lambda q, v, s: q.metadata.epoch_ns != v.metadata.epoch_ns
+    )
+
+    assert matches[0][0][2].metadata.image_uuid == d_id
+    assert matches[1][0][2].metadata.image_uuid == c_id
+
+
+def test_batch_query_embeddings_filter():
+    vlc_db = ob.VlcDb(3)
+    session_id = vlc_db.add_session(0)
+
+    a_id = vlc_db.add_image(session_id, 0, None)
+    vlc_db.update_embedding(a_id, np.array([0, 0, 1]))
+
+    b_id = vlc_db.add_image(session_id, 10, None)
+    vlc_db.update_embedding(b_id, np.array([0, 1, 0]))
+
+    c_id = vlc_db.add_image(session_id, 20, None)
+    vlc_db.update_embedding(c_id, np.array([0, 1 / np.sqrt(2), 1 / np.sqrt(2)]))
+
+    d_id = vlc_db.add_image(session_id, 30, None)
+    vlc_db.update_embedding(d_id, np.array([0, 0, 0.9]))
+
+    matches = vlc_db.batch_query_embeddings_filter(
+        np.array([[0, 0, 1], [0, 1, 0]]), 1, lambda q, v, s: True
+    )
+
+    assert len(matches) == 2
+    assert len(matches[0]) == 1
+    assert len(matches[1]) == 1
+
+    # assert matches[0][0][1].metadata.image_uuid == a_id
+    assert matches[0][0][2].metadata.image_uuid == a_id
+
+    # assert matches[1][0][1].metadata.image_uuid == b_id
+    assert matches[1][0][2].metadata.image_uuid == b_id
+
+    metadata = [vlc_db.get_image(a_id), vlc_db.get_image(b_id)]
+    matches = vlc_db.batch_query_embeddings_filter(
+        np.array([[0, 0, 1], [0, 1, 0]]),
+        1,
+        lambda q, v, s: q.metadata.epoch_ns != v.metadata.epoch_ns,
+        filter_metadata=metadata,
+    )
+
+    assert matches[0][0][2].metadata.image_uuid == d_id
+    assert matches[1][0][2].metadata.image_uuid == c_id
+
+    matches = vlc_db.batch_query_embeddings_filter(
+        np.array([[0, 1, 0]]),
+        1,
+        lambda q, v, s: v.metadata.epoch_ns < 10,
+    )
+
+    assert matches[0][0][2].metadata.image_uuid == a_id
+
+
+def test_query_embeddings_filter():
+    vlc_db = ob.VlcDb(3)
+    session_id = vlc_db.add_session(0)
+
+    a_id = vlc_db.add_image(session_id, 0, None)
+    vlc_db.update_embedding(a_id, np.array([0, 0, 1]))
+
+    b_id = vlc_db.add_image(session_id, 10, None)
+    vlc_db.update_embedding(b_id, np.array([0, 1, 0]))
+
+    c_id = vlc_db.add_image(session_id, 20, None)
+    vlc_db.update_embedding(c_id, np.array([0, 1 / np.sqrt(2), 1 / np.sqrt(2)]))
+
+    d_id = vlc_db.add_image(session_id, 30, None)
+    vlc_db.update_embedding(d_id, np.array([0, 0, 0.9]))
+
+    matches = vlc_db.query_embeddings_filter(np.array([0, 0, 1]), 1, lambda v, s: True)
+    assert len(matches) == 1
+    assert len(matches[0]) == 2
+
+    assert matches[0][1].metadata.image_uuid == a_id
+
+    matches = vlc_db.query_embeddings_filter(
+        np.array([0, 0, 1]),
+        1,
+        lambda v, s: v.metadata.epoch_ns != 0,
+    )
+    assert matches[0][1].metadata.image_uuid == d_id
+
+    matches = vlc_db.query_embeddings_filter(
+        np.array([0, 0, 1]),
+        2,
+        lambda v, s: v.metadata.epoch_ns != 0,
+    )
+    assert matches[0][1].metadata.image_uuid == d_id
+    assert matches[1][1].metadata.image_uuid == c_id
 
 
 def test_update_keypoints():
@@ -236,10 +387,6 @@ def test_iterate_lcs():
     )
     lc_uuid_2 = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts_2)
 
-    uuids = []
-    for lc in vlc_db.iterate_lcs():
-        uuids.append(lc.metadata.lc_uuid)
-        assert lc.metadata.lc_uuid in [lc_uuid_1, lc_uuid_2]
-
-    for u in [lc_uuid_1, lc_uuid_2]:
-        assert u in uuids
+    assert set((lc_uuid_1, lc_uuid_2)) == set(
+        [lc.metadata.lc_uuid for lc in vlc_db.iterate_lcs()]
+    )
