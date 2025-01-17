@@ -1,19 +1,13 @@
 from datetime import datetime
 
 import cv2
-
+import matplotlib.pyplot as plt
+import numpy as np
+from salad_example import get_salad_model
+from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 from tqdm import tqdm
 
-import numpy as np
-import matplotlib.pyplot as plt
-
-from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
-
-from vlc_db.vlc_db import VlcDb
-from vlc_db.spark_image import SparkImage
-
-from salad_example import get_salad_model
-
+import ouroboros as ob
 
 embedding_model = get_salad_model()
 
@@ -47,7 +41,7 @@ loader = RosbagDataLoader(
 images = None  # numpy array
 poses = None  # 7d vector
 
-vlc_db = VlcDb(8448)
+vlc_db = ob.VlcDb(8448)
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
 
@@ -65,7 +59,7 @@ with loader:
         pose = data.pose
         full_poses.append(pose.matrix())
 
-        uid = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
+        uid = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
         embedding = embedding_model(image)
         vlc_db.update_embedding(uid, embedding)
 

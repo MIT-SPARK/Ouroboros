@@ -4,11 +4,9 @@ from datetime import datetime
 import imageio.v3 as iio
 import numpy as np
 
-from vlc_db.spark_image import SparkImage
-from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.vlc_db import VlcDb
+import ouroboros as ob
 
-vlc_db = VlcDb(3)
+vlc_db = ob.VlcDb(3)
 
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
@@ -20,7 +18,7 @@ def load_resource_image(image_name):
 
 
 def insert_image(db, image):
-    uid = db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
+    uid = db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
 
     # TODO: expand the example to generate these with a real VLC pipeline
     # db.update_embedding()
@@ -56,7 +54,7 @@ print("Querying 0,1,1")
 imgs, dists = vlc_db.query_embeddings(np.array([[0, 1, 1]]), 2)
 
 computed_ts = datetime.now()
-loop_closure = SparkLoopClosure(
+loop_closure = ob.SparkLoopClosure(
     from_image_uuid=a_id,
     to_image_uuid=b_id,
     f_T_t=np.eye(4),
