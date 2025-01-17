@@ -1,18 +1,16 @@
 from datetime import datetime
-import functools
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from salad_example import get_salad_model
 from scipy.spatial.transform import Rotation as R
-
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
-from vlc_db.vlc_db import VlcDb
-from vlc_db.spark_loop_closure import SparkLoopClosure
-from vlc_db.spark_image import SparkImage
-from vlc_db.gt_lc_utils import VlcPose, recover_pose, compute_descriptor_similarity
-
-from salad_example import get_salad_model
+import ouroboros as ob
+from ouroboros.vlc_db.gt_lc_utils import (
+    VlcPose,
+    recover_pose,
+)
 
 
 def plot_heading(positions, rpy):
@@ -45,7 +43,7 @@ loader = RosbagDataLoader(
 images = None  # numpy array
 poses = None  # 7d vector
 
-vlc_db = VlcDb(8448)
+vlc_db = ob.VlcDb(8448)
 robot_id = 0
 session_id = vlc_db.add_session(robot_id)
 
@@ -65,7 +63,7 @@ with loader:
 
         if not idx % 2 == 0:
             continue
-        uid = vlc_db.add_image(session_id, datetime.now(), SparkImage(rgb=image))
+        uid = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
         embedding = embedding_model(image)
         # embedding = VlcPose(
         #    time_ns=data.timestamp,
@@ -157,7 +155,7 @@ for key_from, key_to in putative_loop_closures:
 
     # relative_pose = recover_pose(img_from, img_to)
     relative_pose = recover_pose(img_from.descriptors, img_to.descriptors)
-    loop_closure = SparkLoopClosure(
+    loop_closure = ob.SparkLoopClosure(
         from_image_uuid=key_from,
         to_image_uuid=key_to,
         f_T_t=relative_pose,
