@@ -1,0 +1,6 @@
+<launch>
+  <remap from="~image_in" to="/husky/camera/rgb/image"/>
+  <node pkg="ouroboros_ros" type="vlc_server_node.py" name="vlc_server_node" required="true" output="screen" >
+        <rosparam command="load" file="$(find ouroboros_ros)/config/vlc_server_node.yaml" subst_value="true"/>
+  </node>
+</launch>
