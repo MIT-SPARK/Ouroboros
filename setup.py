@@ -1,7 +1,11 @@
+import glob
+import pathlib
 import subprocess
 
-from pybind11.setup_helpers import Pybind11Extension
+from pybind11.setup_helpers import ParallelCompile, Pybind11Extension, build_ext
 from setuptools import find_packages, setup
+
+ParallelCompile("NPY_NUM_BUILD_JOBS").install()
 
 
 def _get_flags(name):
@@ -13,14 +17,19 @@ def _get_flags(name):
     )
 
 
+def _get_eigen_flags():
+    flags = _get_flags("eigen3")
+    assert len(flags) == 1
+    assert flags[0][:2] == "-I"
+    return [flags[0], str(pathlib.Path(flags[0]) / "unsupported")]
+
+
 ext_modules = [
     Pybind11Extension(
         "_ouroboros_opengv",
-        [
-            "src/ouroboros-opengv/_bindings.cpp",
-            "third_party/opengv/src/relative_pose/CentralRelativeAdapter.cpp",
-        ],
-        extra_compile_args=["-Ithird_party/opengv/include"] + _get_flags("eigen3"),
+        ["src/ouroboros-opengv/_bindings.cpp"]
+        + sorted(glob.glob("third_party/opengv/src/**/*.cpp", recursive=True)),
+        extra_compile_args=["-Ithird_party/opengv/include"] + _get_eigen_flags(),
     )
 ]
 
@@ -44,4 +53,5 @@ setup(
         "scipy",
     ],
     ext_modules=ext_modules,
+    cmdclass={"build_ext": build_ext},
 )
