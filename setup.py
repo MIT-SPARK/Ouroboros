@@ -27,7 +27,7 @@ def _get_eigen_flags():
 ext_modules = [
     Pybind11Extension(
         "_ouroboros_opengv",
-        ["src/ouroboros-opengv/_bindings.cpp"]
+        ["src/ouroboros_opengv/_bindings.cpp"]
         + sorted(glob.glob("third_party/opengv/src/**/*.cpp", recursive=True)),
         extra_compile_args=["-Ithird_party/opengv/include"] + _get_eigen_flags(),
     )
