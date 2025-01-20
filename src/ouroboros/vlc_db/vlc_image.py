@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ouroboros.vlc_db.spark_image import SparkImage
+from ouroboros.vlc_db.vlc_pose import VlcPose
 
 
 @dataclass
@@ -19,3 +20,4 @@ class VlcImage:
     embedding: np.ndarray = None
     keypoints: np.ndarray = None
     descriptors: np.ndarray = None
+    pose_hint: VlcPose = None
