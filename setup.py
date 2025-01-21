@@ -17,5 +17,6 @@ setup(
         "pytest",
         "importlib-resources",
         "scipy",
+        "matplotlib",
     ],
 )
