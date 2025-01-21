@@ -18,5 +18,6 @@ setup(
         "importlib-resources",
         "scipy",
         "matplotlib",
+        "opencv-python",
     ],
 )
