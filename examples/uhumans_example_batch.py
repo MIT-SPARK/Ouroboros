@@ -6,11 +6,8 @@ from scipy.spatial.transform import Rotation as R
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
-from ouroboros.vlc_db.gt_lc_utils import (
-    VlcPose,
-    recover_pose,
-)
-from ouroboros_salad import get_salad_model
+from ouroboros_gt.gt_pose_recovery import get_gt_pose_model
+from ouroboros_salad.salad_model import get_salad_model
 
 
 def plot_heading(positions, rpy):
@@ -63,8 +60,9 @@ with loader:
 
         if not idx % 2 == 0:
             continue
-        uid = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
-        embedding = embedding_model(image)
+        simg = ob.SparkImage(rgb=image)
+        uid = vlc_db.add_image(session_id, datetime.now(), simg)
+        embedding = embedding_model.infer(simg)
         # embedding = VlcPose(
         #    time_ns=data.timestamp,
         #    position=pose.translation,
@@ -95,7 +93,7 @@ for matches_to_frame in matches:
         continue
     putative_loop_closures.append((matches_to_frame[0][1], matches_to_frame[0][2]))
 
-
+pose_model = get_gt_pose_model()
 # Recover poses from matching loop closures
 for img_from, img_to in putative_loop_closures:
     key_from = img_from.metadata.image_uuid
@@ -106,7 +104,7 @@ for img_from, img_to in putative_loop_closures:
         # descriptors = generate_descriptors(img_from.image)
         keypoints = np.zeros([1, 2])
         pose = uid_to_pose[key_from]
-        desc = VlcPose(
+        desc = ob.VlcPose(
             time_ns=img_from.metadata.epoch_ns,
             position=pose[:3, 3],
             rotation=R.from_matrix(pose[:3, :3]).as_quat(),
@@ -123,7 +121,7 @@ for img_from, img_to in putative_loop_closures:
         # descriptors = generate_descriptors(img_to.image)
         keypoints = np.zeros([1, 2])
         pose = uid_to_pose[key_to]
-        desc = VlcPose(
+        desc = ob.VlcPose(
             time_ns=img_to.metadata.epoch_ns,
             position=pose[:3, 3],
             rotation=R.from_matrix(pose[:3, :3]).as_quat(),
@@ -134,8 +132,7 @@ for img_from, img_to in putative_loop_closures:
         vlc_db.update_keypoints(key_to, keypoints, descriptors)
         img_to = vlc_db.get_image(key_to)
 
-    # relative_pose = recover_pose(img_from, img_to)
-    relative_pose = recover_pose(img_from.descriptors, img_to.descriptors)
+    relative_pose = pose_model.infer(img_from, img_to)
     loop_closure = ob.SparkLoopClosure(
         from_image_uuid=key_from,
         to_image_uuid=key_to,

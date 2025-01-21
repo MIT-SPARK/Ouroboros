@@ -58,8 +58,9 @@ with loader:
         pose = data.pose
         full_poses.append(pose.matrix())
 
-        uid = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
-        embedding = embedding_model(image)
+        simg = ob.SparkImage(rgb=image)
+        uid = vlc_db.add_image(session_id, datetime.now(), simg)
+        embedding = embedding_model.infer(simg)
         vlc_db.update_embedding(uid, embedding)
 
         # To check our estimate vs. GT later

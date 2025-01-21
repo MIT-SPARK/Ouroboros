@@ -16,7 +16,7 @@ class SaladModel:
 
         self.input_transform = get_input_transform((322, 434))
 
-    def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose):
+    def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose = None):
         img_float = torch.tensor((image.rgb.transpose() / 255.0).astype(np.float32))
         img = self.input_transform(img_float)
         out = self.model(img.unsqueeze(0).to("cuda")).cpu().detach().numpy()
