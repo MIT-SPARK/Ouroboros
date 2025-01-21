@@ -1,5 +1,5 @@
-from ouroboros.vlc_db.vlc_pose import pose_from_quat_trans, invert_pose, VlcPose
 import ouroboros as ob
+from ouroboros.vlc_db.vlc_pose import VlcPose, invert_pose, pose_from_quat_trans
 
 
 def recover_pose(query_descriptors, match_descriptors):
@@ -22,7 +22,6 @@ def get_gt_pose_model():
 
 
 class GtPoseModel:
-
     def __init__(self):
         pass
 

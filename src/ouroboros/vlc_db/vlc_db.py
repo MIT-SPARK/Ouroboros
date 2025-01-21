@@ -1,16 +1,16 @@
 from datetime import datetime
-from typing import Union, Callable, TypeVar, Tuple, List, Optional
+from typing import Callable, List, Optional, Tuple, TypeVar, Union
+
 import numpy as np
 
 from ouroboros.vlc_db.spark_image import SparkImage
-from ouroboros.vlc_db.vlc_image import VlcImage
-
-from ouroboros.vlc_db.vlc_image_table import VlcImageTable
-from ouroboros.vlc_db.vlc_lc_table import LcTable
-from ouroboros.vlc_db.vlc_session_table import SessionTable
 from ouroboros.vlc_db.spark_loop_closure import SparkLoopClosure
 from ouroboros.vlc_db.utils import epoch_ns_from_datetime
+from ouroboros.vlc_db.vlc_image import VlcImage
+from ouroboros.vlc_db.vlc_image_table import VlcImageTable
+from ouroboros.vlc_db.vlc_lc_table import LcTable
 from ouroboros.vlc_db.vlc_pose import VlcPose
+from ouroboros.vlc_db.vlc_session_table import SessionTable
 
 
 class KeypointSizeException(BaseException):
@@ -137,9 +137,9 @@ class VlcDb:
         Returns the top k closest matches and the match distances
         """
 
-        assert (
-            embeddings.ndim == 2
-        ), f"Batch query requires an NxD array of query embeddings, not {embeddings.shape}"
+        assert embeddings.ndim == 2, (
+            f"Batch query requires an NxD array of query embeddings, not {embeddings.shape}"
+        )
 
         return self._image_table.query_embeddings(embeddings, k, similarity_metric)
 

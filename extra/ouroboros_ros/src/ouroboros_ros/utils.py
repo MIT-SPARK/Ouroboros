@@ -1,6 +1,6 @@
+import numpy as np
 import rospy
 import tf2_ros
-import numpy as np
 
 from ouroboros import VlcPose
 

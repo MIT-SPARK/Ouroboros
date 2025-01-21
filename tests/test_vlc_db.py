@@ -81,16 +81,16 @@ def test_query_embedding():
 
     imgs, sims = vlc_db.query_embeddings(np.array([0, 0.2, 0.8]), 2)
     assert len(imgs) == 2, "query_embeddings returned wrong number of matches"
-    assert set((a_id, d_id)) == set(
-        [img.metadata.image_uuid for img in imgs]
-    ), "Query did not match k closest"
+    assert set((a_id, d_id)) == set([img.metadata.image_uuid for img in imgs]), (
+        "Query did not match k closest"
+    )
 
     imgs, sims = vlc_db.query_embeddings(np.array([0, 0.2, 0.8]), 3)
     assert len(imgs) == 3, "query_embeddings returned wrong number of matches"
 
-    assert set((a_id, c_id, d_id)) == set(
-        [img.metadata.image_uuid for img in imgs]
-    ), "Query did not match k closest"
+    assert set((a_id, c_id, d_id)) == set([img.metadata.image_uuid for img in imgs]), (
+        "Query did not match k closest"
+    )
 
 
 def test_query_embedding_custom_similarity():
@@ -162,12 +162,12 @@ def test_batch_query_embeddings():
     imgs, sims = vlc_db.batch_query_embeddings(np.array([[0, 1, 0], [0, 0.2, 0.2]]), 1)
     assert len(imgs) == 2, "number of results different from number of query vectors"
     assert len(imgs[0]) == 1, "returned wrong number of matches for vector"
-    assert (
-        imgs[0][0].metadata.image_uuid == b_id
-    ), "Did not match correct image embedding"
-    assert (
-        imgs[1][0].metadata.image_uuid == c_id
-    ), "Did not match correct image embedding"
+    assert imgs[0][0].metadata.image_uuid == b_id, (
+        "Did not match correct image embedding"
+    )
+    assert imgs[1][0].metadata.image_uuid == c_id, (
+        "Did not match correct image embedding"
+    )
 
 
 def test_batch_query_embeddings_uuid_filter():

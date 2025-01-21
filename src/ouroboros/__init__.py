@@ -9,5 +9,4 @@ from ouroboros.vlc_db import (
     VlcImageMetadata,
     VlcPose,
 )
-
 from ouroboros.vlc_server.vlc_server import VlcServer

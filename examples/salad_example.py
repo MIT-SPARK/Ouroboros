@@ -1,7 +1,9 @@
 import pathlib
+
 import imageio.v3 as iio
-from ouroboros_salad.salad_model import get_salad_model
+
 import ouroboros as ob
+from ouroboros_salad.salad_model import get_salad_model
 
 
 def resource_dir():

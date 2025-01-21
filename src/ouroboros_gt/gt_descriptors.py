@@ -8,7 +8,6 @@ def get_gt_descriptor_model():
 
 
 class GtDescriptorModel:
-
     def __init__(self):
         pass
 
