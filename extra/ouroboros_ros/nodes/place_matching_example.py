@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-import rospy
-
-from dynamic_reconfigure.server import Server
-from sensor_msgs.msg import Image
 import cv_bridge
-
-from ouroboros import VlcDb, SparkImage
-from ouroboros_salad.salad_model import get_salad_model
+import rospy
+from dynamic_reconfigure.server import Server
 from ouroboros_ros.cfg import PlaceDescriptorDebuggingConfig
+from sensor_msgs.msg import Image
+
+from ouroboros import SparkImage, VlcDb
 from ouroboros.utils.plotting_utils import display_image_pair
+from ouroboros_salad.salad_model import get_salad_model
 
 
 class PlaceDescriptorExample:

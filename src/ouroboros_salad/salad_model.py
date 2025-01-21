@@ -1,15 +1,14 @@
 import numpy as np
 import torch
 import torchvision.transforms as T
+
 import ouroboros as ob
 
 torch.backends.cudnn.benchmark = True
 
 
 class SaladModel:
-
     def __init__(self, model):
-
         self.embedding_size = 8448
         self.similarity_metric = "ip"
         self.model = model

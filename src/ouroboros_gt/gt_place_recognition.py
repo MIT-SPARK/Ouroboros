@@ -8,9 +8,7 @@ def get_gt_place_model():
 
 
 class GtPlaceModel:
-
     def __init__(self):
-
         self.embedding_size = 8
         self.lc_recent_lockout_ns = 20 * 1e9
         self.lc_distance_threshold = 5

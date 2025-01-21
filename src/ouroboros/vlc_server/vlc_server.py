@@ -1,12 +1,12 @@
 # TODO: move this to ouroboros, not ouroboros_ros
-from typing import Tuple, List, Optional
-from ouroboros.utils.plotting_utils import display_image_pair
-import ouroboros as ob
 from datetime import datetime
+from typing import List, Optional, Tuple
+
+import ouroboros as ob
+from ouroboros.utils.plotting_utils import display_image_pair
 
 
 class VlcServer:
-
     def __init__(
         self,
         place_method,
@@ -71,7 +71,6 @@ class VlcServer:
     def add_and_query_frame(
         self, image: ob.SparkImage, time_ns: int, pose_hint: ob.VlcPose = None
     ) -> Tuple[str, Optional[List[ob.SparkLoopClosure]]]:
-
         embedding = self.place_model.infer(image, pose_hint)
 
         image_matches, similarities = self.vlc_db.query_embeddings_max_time(
@@ -111,7 +110,6 @@ class VlcServer:
 
         # TODO: support multiple possible place descriptor matches
         if image_match is not None:
-
             if not self.strict_keypoint_evaluation:
                 # Since we just added the current image, we know that no keypoints
                 # or descriptors have been generated for it

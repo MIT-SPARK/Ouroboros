@@ -15,7 +15,6 @@ from ouroboros.utils.plotting_utils import plt_fast_pause
 
 
 def update_plot(line, pts, images_to_pose):
-
     if len(images_to_pose) == 0:
         return
 
@@ -35,7 +34,6 @@ def update_plot(line, pts, images_to_pose):
 
 
 def plot_lc(lc, image_to_pose):
-
     query_pos = image_to_pose[lc.from_image_uuid].position
     match_pos = image_to_pose[lc.to_image_uuid].position
     plt.plot(
@@ -52,7 +50,6 @@ def build_lc_message(
     from_T_to,
     pose_cov,
 ):
-
     relative_position = from_T_to[:3, 3]
     relative_orientation = R.from_matrix(from_T_to[:3, :3])
 
@@ -77,9 +74,7 @@ def build_lc_message(
 
 
 class VlcServerRos:
-
     def __init__(self):
-
         self.tf_buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
@@ -133,7 +128,6 @@ class VlcServerRos:
         self.image_sub = rospy.Subscriber("~image_in", Image, self.image_callback)
 
     def image_callback(self, msg):
-
         if not (
             self.last_vlc_frame_time is None
             or (rospy.Time.now() - self.last_vlc_frame_time).to_sec()
@@ -173,7 +167,6 @@ class VlcServerRos:
         pg = PoseGraph()
         pg.header.stamp = rospy.Time.now()
         for lc in loop_closures:
-
             if self.show_plots:
                 plot_lc(lc, self.images_to_pose)
 
@@ -210,7 +203,6 @@ class VlcServerRos:
             self.loop_rate.sleep()
 
     def step(self):
-
         if self.show_plots:
             update_plot(self.position_line, self.position_points, self.images_to_pose)
 

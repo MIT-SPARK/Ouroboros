@@ -8,7 +8,6 @@ def get_gt_keypoint_model():
 
 
 class GtKeypointModel:
-
     def __init__(self):
         pass
 
