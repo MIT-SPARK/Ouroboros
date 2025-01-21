@@ -2,7 +2,7 @@ fixed_frame: world
 camera_frame: ground_truth/husky/base
 show_plots: true
 lc_recent_pose_lockout_s: 20
-lc_similarity_threshold: 0.55
+lc_similarity_threshold: 0.65
 lc_send_delay_s: 15
 place_method: "salad"
 keypoint_method: "ground_truth"

@@ -32,6 +32,4 @@ def create_image_pair(left, right):
 def display_image_pair(left, right, window="matches"):
     img = create_image_pair(left, right)
     cv2.imshow(window, img.astype(np.uint8))
-    print("going to show")
     cv2.waitKey(10)
-    print("showed")

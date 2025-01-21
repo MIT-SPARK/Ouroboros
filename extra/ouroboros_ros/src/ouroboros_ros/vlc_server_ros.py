@@ -169,7 +169,7 @@ class VlcServerRos:
         if loop_closures is None:
             return
 
-        pose_cov_mat = self.build_pose_cov_mat
+        pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
         pg.header.stamp = rospy.Time.now()
         for lc in loop_closures:
@@ -189,7 +189,7 @@ class VlcServerRos:
 
             pg.edges.append(lc_edge)
         self.loop_closure_delayed_queue.append(
-            (rospy.Time.now().to_sec() + self.lc_send_delay, pg)
+            (rospy.Time.now().to_sec() + self.lc_send_delay_s, pg)
         )
 
     def build_pose_cov_mat(self):
