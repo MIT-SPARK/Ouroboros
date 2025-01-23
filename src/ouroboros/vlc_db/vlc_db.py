@@ -1,18 +1,19 @@
 from datetime import datetime
-from typing import Union, Callable, TypeVar, Tuple, List, Optional
+from typing import Callable, List, Optional, Tuple, TypeVar, Union
+
 import numpy as np
 
 from ouroboros.vlc_db.spark_image import SparkImage
-from ouroboros.vlc_db.vlc_image import VlcImage
-
-from ouroboros.vlc_db.vlc_image_table import VlcImageTable
-from ouroboros.vlc_db.vlc_lc_table import LcTable
-from ouroboros.vlc_db.vlc_session_table import SessionTable
 from ouroboros.vlc_db.spark_loop_closure import SparkLoopClosure
 from ouroboros.vlc_db.utils import epoch_ns_from_datetime
+from ouroboros.vlc_db.vlc_image import VlcImage
+from ouroboros.vlc_db.vlc_image_table import VlcImageTable
+from ouroboros.vlc_db.vlc_lc_table import LcTable
+from ouroboros.vlc_db.vlc_pose import VlcPose
+from ouroboros.vlc_db.vlc_session_table import SessionTable
 
 
-class KeypointSizeException:
+class KeypointSizeException(BaseException):
     pass
 
 
@@ -30,9 +31,12 @@ class VlcDb:
         session_id: str,
         image_timestamp: Union[int, datetime],
         image: SparkImage,
+        pose_hint: VlcPose = None,
     ) -> str:
         """image_timestamp should be a datetime object or integer number of nanoseconds"""
-        return self._image_table.add_image(session_id, image_timestamp, image)
+        return self._image_table.add_image(
+            session_id, image_timestamp, image, pose_hint
+        )
 
     def get_image(self, image_uuid: str) -> VlcImage:
         img = self._image_table.get_image(image_uuid)
@@ -133,9 +137,9 @@ class VlcDb:
         Returns the top k closest matches and the match distances
         """
 
-        assert (
-            embeddings.ndim == 2
-        ), f"Batch query requires an NxD array of query embeddings, not {embeddings.shape}"
+        assert embeddings.ndim == 2, (
+            f"Batch query requires an NxD array of query embeddings, not {embeddings.shape}"
+        )
 
         return self._image_table.query_embeddings(embeddings, k, similarity_metric)
 
@@ -190,6 +194,7 @@ class VlcDb:
 
     def update_embedding(self, image_uuid: str, embedding):
         self._image_table.update_embedding(image_uuid, embedding)
+        return self.get_image(image_uuid)
 
     def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
         if descriptors is not None:
@@ -198,6 +203,7 @@ class VlcDb:
         self._image_table.update_keypoints(
             image_uuid, keypoints, descriptors=descriptors
         )
+        return self.get_image(image_uuid)
 
     def get_keypoints(self, image_uuid: str):
         return self._image_table.get_keypoints(image_uuid)

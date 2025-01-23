@@ -7,4 +7,6 @@ from ouroboros.vlc_db import (
     VlcDb,
     VlcImage,
     VlcImageMetadata,
+    VlcPose,
 )
+from ouroboros.vlc_server.vlc_server import VlcServer

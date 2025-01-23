@@ -1,12 +1,14 @@
+import uuid
 from datetime import datetime
 from typing import Union
-import uuid
+
 import numpy as np
 
-from ouroboros.vlc_db.spark_image import SparkImage
-from ouroboros.vlc_db.vlc_image import VlcImage, VlcImageMetadata
 from ouroboros.vlc_db.invertible_vector_store import InvertibleVectorStore
+from ouroboros.vlc_db.spark_image import SparkImage
 from ouroboros.vlc_db.utils import epoch_ns_from_datetime
+from ouroboros.vlc_db.vlc_image import VlcImage, VlcImageMetadata
+from ouroboros.vlc_db.vlc_pose import VlcPose
 
 
 class VlcImageTable:
@@ -16,6 +18,7 @@ class VlcImageTable:
         self.embedding_store = InvertibleVectorStore(image_embedding_dimension)
         self.keypoints_store = {}
         self.descriptors_store = {}
+        self.pose_store = {}
 
     def get_image(self, image_uuid):
         if image_uuid not in self.metadata_store:
@@ -28,8 +31,9 @@ class VlcImageTable:
             embedding = None
         keypoints = self.keypoints_store[image_uuid]
         descriptors = self.descriptors_store[image_uuid]
+        pose = self.pose_store[image_uuid]
 
-        vlc_image = VlcImage(metadata, image, embedding, keypoints, descriptors)
+        vlc_image = VlcImage(metadata, image, embedding, keypoints, descriptors, pose)
         return vlc_image
 
     def get_image_keys(self):
@@ -69,6 +73,7 @@ class VlcImageTable:
         session_id: str,
         image_timestamp: Union[int, datetime],
         image: SparkImage,
+        pose_hint: VlcPose = None,
     ) -> str:
         new_uuid = str(uuid.uuid4())
 
@@ -82,6 +87,7 @@ class VlcImageTable:
         )
         self.metadata_store[new_uuid] = metadata
         self.image_store[new_uuid] = image
+        self.pose_store[new_uuid] = pose_hint
         self.keypoints_store[new_uuid] = None
         self.descriptors_store[new_uuid] = None
         return new_uuid

@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="ouroboros",
@@ -10,5 +10,14 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={"": ["*.yaml"]},
-    install_requires=["numpy", "imageio", "pyyaml", "pytest", "importlib-resources"],
+    install_requires=[
+        "numpy",
+        "imageio",
+        "pyyaml",
+        "pytest",
+        "importlib-resources",
+        "scipy",
+        "matplotlib",
+        "opencv-python",
+    ],
 )

@@ -3,10 +3,10 @@ from datetime import datetime
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from ouroboros_salad.salad_model import get_salad_model
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
+from ouroboros_salad.salad_model import get_salad_model
 
 embedding_model = get_salad_model()
 
@@ -58,8 +58,9 @@ with loader:
         pose = data.pose
         full_poses.append(pose.matrix())
 
-        uid = vlc_db.add_image(session_id, datetime.now(), ob.SparkImage(rgb=image))
-        embedding = embedding_model(image)
+        simg = ob.SparkImage(rgb=image)
+        uid = vlc_db.add_image(session_id, datetime.now(), simg)
+        embedding = embedding_model.infer(simg)
         vlc_db.update_embedding(uid, embedding)
 
         # To check our estimate vs. GT later

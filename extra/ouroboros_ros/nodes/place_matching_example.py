@@ -1,27 +1,13 @@
 #!/usr/bin/env python3
-import rospy
-
-from dynamic_reconfigure.server import Server
-from sensor_msgs.msg import Image
-import cv2
 import cv_bridge
-import numpy as np
-
-from ouroboros import VlcDb, SparkImage
-from ouroboros_salad.salad_model import get_salad_model
+import rospy
+from dynamic_reconfigure.server import Server
 from ouroboros_ros.cfg import PlaceDescriptorDebuggingConfig
+from sensor_msgs.msg import Image
 
-
-def display_image_pair(left, right):
-    r = left.shape[0]
-    c = left.shape[1] * 2 + 10
-    img_out = np.zeros((r, c, 3))
-    img_out[: left.shape[0], : left.shape[1], :] = left
-    if right is not None:
-        img_out[:, left.shape[1] + 10 :, :] = right
-
-    cv2.imshow("matches", img_out.astype(np.uint8))
-    cv2.waitKey(1)
+from ouroboros import SparkImage, VlcDb
+from ouroboros.utils.plotting_utils import display_image_pair
+from ouroboros_salad.salad_model import get_salad_model
 
 
 class PlaceDescriptorExample:
