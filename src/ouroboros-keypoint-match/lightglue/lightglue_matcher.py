@@ -8,6 +8,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 import torch
 
+
 class LightGlueMatcher(MatcherBase):
     def __init__(self, max_num_keypoints=2048, device=None):
         if device is None:
@@ -15,7 +16,9 @@ class LightGlueMatcher(MatcherBase):
         else:
             self.device = device
 
-        self.extractor = SuperPoint(max_num_keypoints=max_num_keypoints).eval().to(self.device)
+        self.extractor = (
+            SuperPoint(max_num_keypoints=max_num_keypoints).eval().to(self.device)
+        )
         self.matcher = LightGlue(features="superpoint").eval().to(self.device)
 
     def load_image(self, img_path, resize):
@@ -30,10 +33,16 @@ class LightGlueMatcher(MatcherBase):
 
         # Match the features
         matches01 = self.matcher({"image0": feats0, "image1": feats1})
-        feats0, feats1, matches01 = [rbd(x) for x in [feats0, feats1, matches01]]  # remove batch dimension
+        feats0, feats1, matches01 = [
+            rbd(x) for x in [feats0, feats1, matches01]
+        ]  # remove batch dimension
 
         # Keep the matching keypoints
-        kpts0, kpts1, matches = feats0["keypoints"], feats1["keypoints"], matches01["matches"]
+        kpts0, kpts1, matches = (
+            feats0["keypoints"],
+            feats1["keypoints"],
+            matches01["matches"],
+        )
         m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
         return kpts0, kpts1, m_kpts0, m_kpts1
@@ -49,4 +58,3 @@ class LightGlueMatcher(MatcherBase):
 
     def get_descriptor_model(self):
         return self.extractor
-

@@ -1,5 +1,6 @@
 from .matcher_base import MatcherBase
 
+
 class KeypointMatcher:
     def set_matcher(self, matcher: MatcherBase):
         self.matcher = matcher
@@ -12,7 +13,7 @@ class KeypointMatcher:
                 resize (tuple of int, optional): Desired size to resize the images to, specified as (height, width).
         """
         return self.matcher.load_image(img_path, resize)
-    
+
     def execute(self, img0, img1):
         """
         Performs image matching using the selected strategy.
@@ -21,7 +22,7 @@ class KeypointMatcher:
                 img1 (Tensor): Second image to be matched.
                 max_num_keypoints (int): Maximum number of keypoints to be found.
                 device (str, optional): The device to run the matching on, either "cuda" or "cpu".
-                
+
             Returns:
                 kpts0 (Tensor): Keypoints detected in the first image after feature extraction.
                 kpts1 (Tensor): Keypoints detected in the second image after feature extraction.

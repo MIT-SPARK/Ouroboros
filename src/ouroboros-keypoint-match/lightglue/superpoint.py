@@ -81,9 +81,7 @@ def sample_descriptors(keypoints, descriptors, s: int = 8):
     keypoints = keypoints - s / 2 + 0.5
     keypoints /= torch.tensor(
         [(w * s - s / 2 - 0.5), (h * s - s / 2 - 0.5)],
-    ).to(
-        keypoints
-    )[None]
+    ).to(keypoints)[None]
     keypoints = keypoints * 2 - 1  # normalize to (-1, 1)
     args = {"align_corners": True} if torch.__version__ >= "1.3" else {}
     descriptors = torch.nn.functional.grid_sample(

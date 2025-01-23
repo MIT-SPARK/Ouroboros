@@ -6,6 +6,7 @@ from .utils import read_image
 import matplotlib.pyplot as plt
 import torch
 
+
 class SuperGlueMatcher(MatcherBase):
     def __init__(self, max_num_keypoints=2048, device=None):
         if device is None:
@@ -17,18 +18,20 @@ class SuperGlueMatcher(MatcherBase):
             "superpoint": {
                 "nms_radius": 4,
                 "keypoint_threshold": 0.005,
-                "max_keypoints": max_num_keypoints 
+                "max_keypoints": max_num_keypoints,
             },
             "superglue": {
                 "weights": "indoor",
                 "sinkhorn_iterations": 20,
                 "match_threshold": 0.2,
-            }
+            },
         }
         self.matching = Matching(config).eval().to(self.device)
 
     def load_image(self, img_path, resize):
-        _, img, _ = read_image(img_path, self.device, resize, rotation=0, resize_float=False)
+        _, img, _ = read_image(
+            img_path, self.device, resize, rotation=0, resize_float=False
+        )
         return img.squeeze(0)
 
     def execute(self, img0, img1):
@@ -58,4 +61,3 @@ class SuperGlueMatcher(MatcherBase):
 
     def get_descriptor_model(self):
         return self.matching.superpoint
-        
