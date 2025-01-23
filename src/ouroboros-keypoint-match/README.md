@@ -1,3 +1,6 @@
-# Ouroboros-Superglue
+# Ouroboros-Keypoint-Matching
 
-Inside `superglue_model.py` add the superglue model construction code. Put any examples in the appropriate top-level directory (`examples` for short scripts, `notebooks` for any jupyter notebooks)
+`notebooks` contains an example Jupyter notebook along with assets for using this package.
+
+`common` contains modules which are used for all keypoint matching algorithms
+
