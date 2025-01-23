@@ -16,3 +16,11 @@ class MatcherBase(ABC):
     @abstractmethod
     def plot(self, img0, img1, m_kpts0, m_kpts1, kpts0, kpts1):
         pass
+
+    @abstractmethod
+    def get_matcher_model(self):
+        pass
+
+    @abstractmethod
+    def get_descriptor_model(self):
+        pass

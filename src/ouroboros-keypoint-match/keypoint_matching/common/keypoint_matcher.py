@@ -41,3 +41,14 @@ class KeypointMatcher:
         """
         self.matcher.plot(img0, img1, m_kpts0, m_kpts1, kpts0, kpts1)
 
+    def get_matcher_model(self):
+        """
+        Returns the model of the keypoint matcher
+        """
+        return self.matcher.get_matcher_model()
+
+    def get_descriptor_model(self):
+        """
+        Returns the model of the interest point detector
+        """
+        return self.matcher.get_descriptor_model()

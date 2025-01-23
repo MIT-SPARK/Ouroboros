@@ -44,3 +44,9 @@ class LightGlueMatcher(MatcherBase):
         plot_keypoints([kpts0, kpts1], colors=["blue", "blue"], ps=10)
         plt.show()
 
+    def get_matcher_model(self):
+        return self.matcher
+
+    def get_descriptor_model(self):
+        return self.extractor
+
