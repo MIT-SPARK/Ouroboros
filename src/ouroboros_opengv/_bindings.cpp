@@ -53,6 +53,7 @@ struct EigenRelativeAdaptor : public RelativeAdapterBase {
     return bearings2.block<3, 1>(0, index);
   }
 
+  // TODO(nathan) think about weighted correspondences
   double getWeight(size_t index) const override { return 1.0; }
 
   Eigen::Vector3d getCamOffset1(size_t index) const override {
@@ -77,13 +78,32 @@ struct EigenRelativeAdaptor : public RelativeAdapterBase {
   Eigen::MatrixXd bearings2;
 };
 
+struct RansacResult {
+  bool valid = false;
+  Eigen::Matrix4d dest_T_src;
+  std::vector<size_t> inliers;
+  double threshold = 1.0;
+  double probability = 0.99;
+};
+
+enum class RelativeSolver {
+  STEWENIUS = CentralRelativePoseSacProblem::STEWENIUS,
+  NISTER = CentralRelativePoseSacProblem::NISTER,
+  SEVENPT = CentralRelativePoseSacProblem::SEVENPT,
+  EIGHTPT = CentralRelativePoseSacProblem::EIGHTPT,
+};
+
 PYBIND11_MODULE(_ouroboros_opengv, module) {
-  module.def("foo", [](int a, int b) { return a + 2 * b; });
+  py::enum_<RelativeSolver>(m, "RelativeSolver")
+      .value("STEWENIUS", RelativeSolver::STEWENIUS)
+      .value("NISTER", RelativeSolver::NISTER)
+      .value("SEVENPT", RelativeSolver::SEVENPT)
+      .value("EIGHTPT", RelativeSolver::EIGHTPT);
 
   module.def(
-      "solve",
-      [](const Eigen::MatrixXd &a, const Eigen::MatrixXd &b, float threshold,
-         size_t max_iterations) {
+      "solve_2d2d",
+      [](const Eigen::MatrixXd &dest, const Eigen::MatrixXd &src,
+         const RansacConfig &config) {
         EigenRelativeAdaptor adaptor(a, b);
         Ransac<CentralRelativePoseSacProblem> ransac;
         ransac.sac_model_ = std::make_shared<CentralRelativePoseSacProblem>(
