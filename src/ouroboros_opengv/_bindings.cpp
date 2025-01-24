@@ -17,43 +17,44 @@ using RelativePoseProblem =
     opengv::sac_problems::relative_pose::CentralRelativePoseSacProblem;
 using AbsolutePoseProblem = opengv::sac_problems::absolute_pose::AbsolutePoseSacProblem;
 
+inline void checkInputs(const Eigen::MatrixXd& m1,
+                        const Eigen::MatrixXd& m2,
+                        const std::string& m1_name,
+                        const std::string& m2_name) {
+  if (m1.rows() == 3 && m2.rows() == 3 && m1.cols() == m2.cols()) {
+    return;
+  }
+
+  std::stringstream ss;
+  ss << "Invalid input shapes! Given " << m1_name << ": [" << m1.rows() << ", "
+     << m1.cols() << "] and " << m2_name << ": [" << m2.rows() << ", " << m2.cols()
+     << "] (expected " << m1_name << ": [3, N] and " << m2_name << ": [3, N])";
+  throw std::invalid_argument(ss.str());
+}
+
 struct EigenRelativeAdaptor : public RelativeAdapterBase {
-  EigenRelativeAdaptor(const Eigen::MatrixXd& bearings1,
-                       const Eigen::MatrixXd& bearings2)
-      : EigenRelativeAdaptor(bearings1, bearings2, Eigen::Matrix3d::Identity()) {}
+  EigenRelativeAdaptor(const Eigen::MatrixXd& dest, const Eigen::MatrixXd& src)
+      : EigenRelativeAdaptor(dest, src, Eigen::Matrix3d::Identity()) {}
 
-  EigenRelativeAdaptor(const Eigen::MatrixXd& bearings1,
-                       const Eigen::MatrixXd& bearings2,
+  EigenRelativeAdaptor(const Eigen::MatrixXd& dest,
+                       const Eigen::MatrixXd& src,
                        const Eigen::Matrix3d& rotation_prior)
-      : EigenRelativeAdaptor(
-            bearings1, bearings2, rotation_prior, Eigen::Vector3d::Zero()) {}
+      : EigenRelativeAdaptor(dest, src, rotation_prior, Eigen::Vector3d::Zero()) {}
 
-  EigenRelativeAdaptor(const Eigen::MatrixXd& _bearings1,
-                       const Eigen::MatrixXd& _bearings2,
+  EigenRelativeAdaptor(const Eigen::MatrixXd& _dest,
+                       const Eigen::MatrixXd& _src,
                        const Eigen::Matrix3d& rotation_prior,
                        const Eigen::Vector3d& translation_prior)
-      : RelativeAdapterBase(translation_prior, rotation_prior),
-        bearings1(_bearings1),
-        bearings2(_bearings2) {
-    if (bearings1.rows() != 3) {
-      throw std::invalid_argument("Invalid shape for bearings1");
-    }
-
-    if (bearings2.rows() != 3) {
-      throw std::invalid_argument("Invalid shape for bearings2");
-    }
-
-    if (bearings1.cols() != bearings2.cols()) {
-      throw std::invalid_argument("Number of bearings do not match");
-    }
+      : RelativeAdapterBase(translation_prior, rotation_prior), dest(_dest), src(_src) {
+    checkInputs(dest, src, "dest_bearings", "src_bearings");
   }
 
   Eigen::Vector3d getBearingVector1(size_t index) const override {
-    return bearings1.block<3, 1>(0, index);
+    return dest.block<3, 1>(0, index);
   }
 
   Eigen::Vector3d getBearingVector2(size_t index) const override {
-    return bearings2.block<3, 1>(0, index);
+    return src.block<3, 1>(0, index);
   }
 
   // TODO(nathan) think about weighted correspondences
@@ -75,40 +76,30 @@ struct EigenRelativeAdaptor : public RelativeAdapterBase {
     return Eigen::Matrix3d::Identity();
   }
 
-  size_t getNumberCorrespondences() const override { return bearings1.cols(); }
+  size_t getNumberCorrespondences() const override { return dest.cols(); }
 
-  Eigen::MatrixXd bearings1;
-  Eigen::MatrixXd bearings2;
+  Eigen::MatrixXd dest;
+  Eigen::MatrixXd src;
 };
 
 struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
-  EigenAbsoluteAdaptor(const Eigen::MatrixXd& points, const Eigen::MatrixXd& bearings)
-      : EigenAbsoluteAdaptor(points, bearings, Eigen::Matrix3d::Identity()) {}
+  EigenAbsoluteAdaptor(const Eigen::MatrixXd& bearings, const Eigen::MatrixXd& points)
+      : EigenAbsoluteAdaptor(bearings, points, Eigen::Matrix3d::Identity()) {}
 
-  EigenAbsoluteAdaptor(const Eigen::MatrixXd& points,
-                       const Eigen::MatrixXd& bearings,
+  EigenAbsoluteAdaptor(const Eigen::MatrixXd& bearings,
+                       const Eigen::MatrixXd& points,
                        const Eigen::Matrix3d& rotation_prior)
       : EigenAbsoluteAdaptor(
-            points, bearings, rotation_prior, Eigen::Vector3d::Zero()) {}
+            bearings, points, rotation_prior, Eigen::Vector3d::Zero()) {}
 
-  EigenAbsoluteAdaptor(const Eigen::MatrixXd& _points,
-                       const Eigen::MatrixXd& _bearings,
+  EigenAbsoluteAdaptor(const Eigen::MatrixXd& _bearings,
+                       const Eigen::MatrixXd& _points,
                        const Eigen::Matrix3d& rotation_prior,
                        const Eigen::Vector3d& translation_prior)
       : AbsoluteAdapterBase(translation_prior, rotation_prior),
-        points(_points),
-        bearings(_bearings) {
-    if (points.rows() != 3) {
-      throw std::invalid_argument("Invalid shape for points");
-    }
-
-    if (bearings.rows() != 3) {
-      throw std::invalid_argument("Invalid shape for bearings");
-    }
-
-    if (bearings.cols() != points.cols()) {
-      throw std::invalid_argument("Number of points and bearings do not match");
-    }
+        bearings(_bearings),
+        points(_points) {
+    checkInputs(bearings, points, "bearings", "points");
   }
 
   Eigen::Vector3d getBearingVector(size_t index) const override {
@@ -132,8 +123,8 @@ struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
 
   size_t getNumberCorrespondences() const override { return bearings.cols(); }
 
-  Eigen::MatrixXd points;
   Eigen::MatrixXd bearings;
+  Eigen::MatrixXd points;
 };
 
 struct RansacResult {
@@ -166,7 +157,7 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
       .def_readonly("dest_T_src", &RansacResult::dest_T_src)
       .def_readonly("inliers", &RansacResult::inliers);
 
-  py::enum_<RelativePoseProblem::Algorithm>(module, "RelativeSolver")
+  py::enum_<RelativePoseProblem::Algorithm>(module, "Solver2d2d")
       .value("STEWENIUS", RelativePoseProblem::Algorithm::STEWENIUS)
       .value("NISTER", RelativePoseProblem::Algorithm::NISTER)
       .value("SEVENPT", RelativePoseProblem::Algorithm::SEVENPT)
@@ -174,7 +165,7 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
       .export_values();
 
   // NOTE(nathan) we don't expose EPNP because it spams stdout
-  py::enum_<AbsolutePoseProblem::Algorithm>(module, "RelativeSolver")
+  py::enum_<AbsolutePoseProblem::Algorithm>(module, "Solver2d3d")
       .value("TWOPT", AbsolutePoseProblem::TWOPT)
       .value("KNEIP", AbsolutePoseProblem::Algorithm::KNEIP)
       .value("GAO", AbsolutePoseProblem::Algorithm::GAO)
@@ -211,13 +202,13 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
   module.def(
       "solve_2d3d",
-      [](const Eigen::MatrixXd& points,
-         const Eigen::MatrixXd& bearings,
+      [](const Eigen::MatrixXd& bearings,
+         const Eigen::MatrixXd& points,
          AbsolutePoseProblem::Algorithm solver,
          size_t max_iterations,
          double threshold,
          double probability) -> RansacResult {
-        EigenAbsoluteAdaptor adaptor(points, bearings);
+        EigenAbsoluteAdaptor adaptor(bearings, points);
         Ransac<AbsolutePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
@@ -230,8 +221,8 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
         return ransac;
       },
-      "points"_a,
       "bearings"_a,
+      "points"_a,
       "solver"_a = AbsolutePoseProblem::Algorithm::KNEIP,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
