@@ -196,6 +196,11 @@ struct RansacResult {
 };
 
 PYBIND11_MODULE(_ouroboros_opengv, module) {
+  py::options options;
+  options.disable_function_signatures();
+
+  module.doc() = R"(Module wrapping opengv two-view geometry solvers.)";
+
   py::class_<RansacResult>(module, "RansacResult")
       .def(py::init<>())
       .def("__bool__", [](const RansacResult& result) -> bool { return result; })
@@ -239,6 +244,18 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
         return ransac;
       },
+      R"(Recover two-view pose up-to-scale via feature correspondences.
+
+Args:
+  src (np.ndarray): Feature bearings arranged as (3, N) for the "src" input.
+  dest (np.ndarray): Feature bearings arranged as (3, N) for the "dest" input.
+  solver (_ouroboros_opengv.Solver2d2d): Minimal solver type to use.
+  max_iterations (int): Maximum RANSAC iterations.
+  threshold (float): Inlier error threshold.
+  probability (float): Likelihood that minimal indices contain at least one inlier.
+
+Returns:
+  _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
       "src"_a,
       "dest"_a,
       "solver"_a = RelativePoseProblem::Algorithm::STEWENIUS,
@@ -267,6 +284,18 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
         return ransac;
       },
+      R"(Recover two-view pose via PnP.
+
+Args:
+  bearings (np.ndarray): Feature bearings arranged as (3, N) for the "src" input.
+  points (np.ndarray): Corresponding points arranged as (3, N) for the "dest" input.
+  solver (_ouroboros_opengv.Solver2d3d): PnP minimal solver type to use.
+  max_iterations (int): Maximum RANSAC iterations.
+  threshold (float): Inlier error threshold.
+  probability (float): Likelihood that minimal indices contain at least one inlier.
+
+Returns:
+  _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
       "bearings"_a,
       "points"_a,
       "solver"_a = AbsolutePoseProblem::Algorithm::KNEIP,
@@ -293,6 +322,18 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
         return ransac;
       },
+      R"(Recover two-view pose via Arun's method.
+
+Args:
+  src (np.ndarray): Point cloud arranged as (3, N) for the "src" input.
+  dest (np.ndarray): Point cloud arranged as (3, N) for the "dest" input.
+  max_iterations (int): Maximum RANSAC iterations.
+  threshold (float): Inlier error threshold.
+  probability (float): Likelihood that minimal indices contain at least one inlier.
+
+Returns:
+  _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
+
       "src"_a,
       "dest"_a,
       "max_iterations"_a = 1000,
