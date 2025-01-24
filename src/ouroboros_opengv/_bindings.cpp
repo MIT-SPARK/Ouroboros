@@ -11,8 +11,11 @@ namespace py = pybind11;
 using namespace py::literals;
 
 using opengv::absolute_pose::AbsoluteAdapterBase;
+using opengv::point_cloud::PointCloudAdapterBase;
 using opengv::relative_pose::RelativeAdapterBase;
 using opengv::sac::Ransac;
+using opengv::sac_problems::point_cloud::PointCloudSacProblem;
+
 using RelativePoseProblem =
     opengv::sac_problems::relative_pose::CentralRelativePoseSacProblem;
 using AbsolutePoseProblem = opengv::sac_problems::absolute_pose::AbsolutePoseSacProblem;
@@ -33,20 +36,20 @@ inline void checkInputs(const Eigen::MatrixXd& m1,
 }
 
 struct EigenRelativeAdaptor : public RelativeAdapterBase {
-  EigenRelativeAdaptor(const Eigen::MatrixXd& dest, const Eigen::MatrixXd& src)
-      : EigenRelativeAdaptor(dest, src, Eigen::Matrix3d::Identity()) {}
+  EigenRelativeAdaptor(const Eigen::MatrixXd& src, const Eigen::MatrixXd& dest)
+      : EigenRelativeAdaptor(src, dest, Eigen::Matrix3d::Identity()) {}
 
-  EigenRelativeAdaptor(const Eigen::MatrixXd& dest,
-                       const Eigen::MatrixXd& src,
+  EigenRelativeAdaptor(const Eigen::MatrixXd& src,
+                       const Eigen::MatrixXd& dest,
                        const Eigen::Matrix3d& rotation_prior)
-      : EigenRelativeAdaptor(dest, src, rotation_prior, Eigen::Vector3d::Zero()) {}
+      : EigenRelativeAdaptor(src, dest, rotation_prior, Eigen::Vector3d::Zero()) {}
 
-  EigenRelativeAdaptor(const Eigen::MatrixXd& _dest,
-                       const Eigen::MatrixXd& _src,
+  EigenRelativeAdaptor(const Eigen::MatrixXd& _src,
+                       const Eigen::MatrixXd& _dest,
                        const Eigen::Matrix3d& rotation_prior,
                        const Eigen::Vector3d& translation_prior)
-      : RelativeAdapterBase(translation_prior, rotation_prior), dest(_dest), src(_src) {
-    checkInputs(dest, src, "dest_bearings", "src_bearings");
+      : RelativeAdapterBase(translation_prior, rotation_prior), src(_src), dest(_dest) {
+    checkInputs(src, dest, "src_bearings", "dest_bearings");
   }
 
   Eigen::Vector3d getBearingVector1(size_t index) const override {
@@ -78,8 +81,8 @@ struct EigenRelativeAdaptor : public RelativeAdapterBase {
 
   size_t getNumberCorrespondences() const override { return dest.cols(); }
 
-  Eigen::MatrixXd dest;
   Eigen::MatrixXd src;
+  Eigen::MatrixXd dest;
 };
 
 struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
@@ -127,6 +130,42 @@ struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
   Eigen::MatrixXd points;
 };
 
+struct EigenPointCloudAdaptor : public PointCloudAdapterBase {
+  EigenPointCloudAdaptor(const Eigen::MatrixXd& src, const Eigen::MatrixXd& dest)
+      : EigenPointCloudAdaptor(src, dest, Eigen::Matrix3d::Identity()) {}
+
+  EigenPointCloudAdaptor(const Eigen::MatrixXd& src,
+                         const Eigen::MatrixXd& dest,
+                         const Eigen::Matrix3d& rotation_prior)
+      : EigenPointCloudAdaptor(src, dest, rotation_prior, Eigen::Vector3d::Zero()) {}
+
+  EigenPointCloudAdaptor(const Eigen::MatrixXd& _src,
+                         const Eigen::MatrixXd& _dest,
+                         const Eigen::Matrix3d& rotation_prior,
+                         const Eigen::Vector3d& translation_prior)
+      : PointCloudAdapterBase(translation_prior, rotation_prior),
+        src(_src),
+        dest(_dest) {
+    checkInputs(src, dest, "src_points", "dest_points");
+  }
+
+  Eigen::Vector3d getPoint1(size_t index) const override {
+    return dest.block<3, 1>(0, index);
+  }
+
+  Eigen::Vector3d getPoint2(size_t index) const override {
+    return src.block<3, 1>(0, index);
+  }
+
+  size_t getNumberCorrespondences() const override { return dest.cols(); }
+
+  // TODO(nathan) think about weighted correspondences
+  double getWeight(size_t index) const override { return 1.0; }
+
+  Eigen::MatrixXd src;
+  Eigen::MatrixXd dest;
+};
+
 struct RansacResult {
   bool valid = false;
   Eigen::Matrix4d dest_T_src;
@@ -142,6 +181,13 @@ struct RansacResult {
   }
 
   RansacResult(const Ransac<AbsolutePoseProblem>& ransac)
+      : valid(true),
+        dest_T_src(Eigen::Matrix4d::Identity()),
+        inliers(ransac.inliers_.begin(), ransac.inliers_.end()) {
+    dest_T_src.block<3, 4>(0, 0) = ransac.model_coefficients_;
+  }
+
+  RansacResult(const Ransac<PointCloudSacProblem>& ransac)
       : valid(true),
         dest_T_src(Eigen::Matrix4d::Identity()),
         inliers(ransac.inliers_.begin(), ransac.inliers_.end()) {
@@ -175,13 +221,13 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
   // TODO(nathan) allow for prior rotation or translation
   module.def(
       "solve_2d2d",
-      [](const Eigen::MatrixXd& dest,
-         const Eigen::MatrixXd& src,
+      [](const Eigen::MatrixXd& src,
+         const Eigen::MatrixXd& dest,
          RelativePoseProblem::Algorithm solver,
          size_t max_iterations,
          double threshold,
          double probability) -> RansacResult {
-        EigenRelativeAdaptor adaptor(dest, src);
+        EigenRelativeAdaptor adaptor(src, dest);
         Ransac<RelativePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
@@ -193,8 +239,8 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
 
         return ransac;
       },
-      "dest"_a,
       "src"_a,
+      "dest"_a,
       "solver"_a = RelativePoseProblem::Algorithm::STEWENIUS,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
@@ -224,6 +270,31 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
       "bearings"_a,
       "points"_a,
       "solver"_a = AbsolutePoseProblem::Algorithm::KNEIP,
+      "max_iterations"_a = 1000,
+      "threshold"_a = 1.0e-2,
+      "probability"_a = 0.99);
+
+  module.def(
+      "solve_3d3d",
+      [](const Eigen::MatrixXd& src,
+         const Eigen::MatrixXd& dest,
+         size_t max_iterations,
+         double threshold,
+         double probability) -> RansacResult {
+        EigenPointCloudAdaptor adaptor(src, dest);
+        Ransac<PointCloudSacProblem> ransac;
+        ransac.max_iterations_ = max_iterations;
+        ransac.threshold_ = threshold;
+        ransac.probability_ = probability;
+        ransac.sac_model_ = std::make_shared<PointCloudSacProblem>(adaptor);
+        if (!ransac.computeModel()) {
+          return {};
+        }
+
+        return ransac;
+      },
+      "src"_a,
+      "dest"_a,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
       "probability"_a = 0.99);
