@@ -10,6 +10,7 @@ class VlcImageMetadata:
     image_uuid: str
     session_id: str
     epoch_ns: int
+    faiss_id: int
 
 
 @dataclass

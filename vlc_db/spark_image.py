@@ -8,6 +8,10 @@ class SparkImage:
     rgb: np.ndarray = None
     depth: np.ndarray = None
 
+    def __init__(self, rgb, depth):
+        self.rgb=rgb
+        self.depth=depth
+
     def __repr__(self):
         s = ""
         if self.rgb is not None:
