@@ -67,7 +67,7 @@ class Config:
     def update(self, config):
         """Load settings from a dumped config."""
         if not isinstance(config, dict):
-            Logger.error(f"Invalid config data provided to {self}")
+            # Logger.error(f"Invalid config data provided to {self}")
             return
 
         for field in dataclasses.fields(self):
@@ -193,7 +193,7 @@ class VirtualConfig:
         try:
             typename = config_data.get("type")
         except Exception:
-            Logger.error(f"Could not get type for {self} from '{config_data}'")
+            # Logger.error(f"Could not get type for {self} from '{config_data}'")
             typename = None
 
         type_changed = typename is not None and self._type != typename
