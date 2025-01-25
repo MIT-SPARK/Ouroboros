@@ -19,8 +19,8 @@ def _get_flags(name):
 
 def _get_eigen_flags():
     flags = _get_flags("eigen3")
-    assert len(flags) == 1
-    assert flags[0][:2] == "-I"
+    assert len(flags) == 1, f"flags: {flags}"
+    assert flags[0][:2] == "-I", f"flags: {flags}"
     return [flags[0], str(pathlib.Path(flags[0]) / "unsupported")]
 
 
