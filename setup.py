@@ -9,12 +9,13 @@ ParallelCompile("NPY_NUM_BUILD_JOBS").install()
 
 
 def _get_flags(name):
-    return (
+    flags = (
         subprocess.run(["pkg-config", "--cflags", name], capture_output=True)
         .stdout.decode("utf-8")
         .strip("\n")
         .split(" ")
     )
+    return [x for x in flags if len(x) > 0]
 
 
 def _get_eigen_flags():
