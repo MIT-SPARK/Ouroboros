@@ -23,9 +23,9 @@ if __name__ == "__main__":
 
     keypoints, descriptors = model.infer(simg)
 
-    kp = keypoints.cpu().numpy().squeeze()
-    desc = descriptors.cpu().numpy().squeeze()
+    kp = keypoints
+    desc = descriptors
     plt.imshow(img_d)
     x, y = kp.T
-    plt.scatter(y, x)
+    plt.scatter(x, y)
     plt.show()

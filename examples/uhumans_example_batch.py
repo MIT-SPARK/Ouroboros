@@ -61,13 +61,13 @@ with loader:
         if not idx % 2 == 0:
             continue
         simg = ob.SparkImage(rgb=image)
-        uid = vlc_db.add_image(session_id, datetime.now(), simg)
-        embedding = embedding_model.infer(simg)
-        # embedding = VlcPose(
-        #    time_ns=data.timestamp,
-        #    position=pose.translation,
-        #    rotation=pose.rotation.as_quat(),
-        # ).to_descriptor()  # Will go away when we use real model
+        vlc_pose = ob.VlcPose(
+            time_ns=data.timestamp,
+            position=pose.translation,
+            rotation=pose.rotation.as_quat(),
+        )
+        uid = vlc_db.add_image(session_id, datetime.now(), simg, pose_hint=vlc_pose)
+        embedding = embedding_model.infer(simg, pose_hint=vlc_pose)
         vlc_db.update_embedding(uid, embedding)
 
         # To check our estimate vs. GT later
