@@ -177,6 +177,7 @@ class VlcServer:
                 )
 
             # 3. extract pose
+            # TODO: matched keypoints go into pose_estimate
             pose_estimate = self.pose_model.infer(vlc_image, image_match)
             lc = ob.SparkLoopClosure(
                 from_image_uuid=img_id,
