@@ -12,4 +12,4 @@ class GtKeypointModel:
         pass
 
     def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose):
-        return np.array([[np.nan, np.nan]])
+        return np.array([[np.nan, np.nan]]), None

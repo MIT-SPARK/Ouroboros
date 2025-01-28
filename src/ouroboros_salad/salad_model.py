@@ -17,14 +17,15 @@ class SaladModel:
 
     def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose = None):
         img_float = torch.tensor((image.rgb.transpose() / 255.0).astype(np.float32))
-        img = self.input_transform(img_float)
-        out = self.model(img.unsqueeze(0).to("cuda")).cpu().detach().numpy()
+        with torch.no_grad():
+            img = self.input_transform(img_float)
+            out = self.model(img.unsqueeze(0).to("cuda")).cpu().numpy()
         return np.squeeze(out)
 
 
 def get_salad_model():
     model = torch.hub.load("serizba/salad", "dinov2_salad")
-    model = model.to("cuda")
+    model = model.eval().to("cuda")
 
     return SaladModel(model)
 

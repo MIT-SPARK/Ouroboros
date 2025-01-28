@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 import ouroboros as ob
-from ouroboros.utils.plotting_utils import display_image_pair
+from ouroboros.utils.plotting_utils import display_image_pair, display_kp_match_pair
 
 
 class VlcServer:
@@ -12,6 +12,7 @@ class VlcServer:
         place_method,
         keypoint_method,
         descriptor_method,
+        match_method,
         pose_method,
         lc_frame_lockout_ns,
         place_match_threshold,
@@ -21,6 +22,7 @@ class VlcServer:
         self.lc_frame_lockout_ns = lc_frame_lockout_ns
         self.place_match_threshold = place_match_threshold
         self.display_place_matches = True
+        self.display_keypoint_matches = True
         self.strict_keypoint_evaluation = strict_keypoint_evaluation
 
         # To be replaced with "virtual configs"
@@ -42,6 +44,10 @@ class VlcServer:
             from ouroboros_gt.gt_keypoint_detection import get_gt_keypoint_model
 
             self.keypoint_model = get_gt_keypoint_model()
+        elif keypoint_method == "superpoint":
+            from ouroboros_keypoints.superpoint_interface import get_superpoint_model
+
+            self.keypoint_model = get_superpoint_model()
         else:
             raise NotImplementedError(
                 f"keypoint extraction method {keypoint_method} not supported"
@@ -51,9 +57,26 @@ class VlcServer:
             from ouroboros_gt.gt_descriptors import get_gt_descriptor_model
 
             self.descriptor_model = get_gt_descriptor_model()
+        elif descriptor_method is None:
+            print(
+                "Desciptor method set to None. Hopefully your keypoint detector returns descriptors too..."
+            )
         else:
             raise NotImplementedError(
                 f"descriptor extraction method {descriptor_method} not supported"
+            )
+
+        if match_method == "ground_truth":
+            from ouroboros_gt.gt_matches import get_gt_match_model
+
+            self.match_model = get_gt_match_model()
+        elif match_method == "lightglue":
+            from ouroboros_keypoints.lightglue_interface import get_lightglue_model
+
+            self.match_model = get_lightglue_model()
+        else:
+            raise NotImplementedError(
+                f"Keypoint matching method {match_method} not supported"
             )
 
         if pose_method == "ground_truth":
@@ -88,10 +111,13 @@ class VlcServer:
         if self.strict_keypoint_evaluation:
             # Optionally force all keypoints/descriptors to be computed when
             # frame is added to db, and not lazily upon finding match
-            image_keypoints = self.keypoint_model.infer(vlc_image.image, pose_hint)
-            image_descriptors = self.descriptor_model.infer(
-                vlc_image.image, image_keypoints, pose_hint
+            image_keypoints, image_descriptors = self.keypoint_model.infer(
+                vlc_image.image, pose_hint
             )
+            if image_descriptors is None:
+                image_descriptors = self.descriptor_model.infer(
+                    vlc_image.image, image_keypoints, pose_hint
+                )
             vlc_image = self.vlc_db.update_keypoints(
                 img_id, image_keypoints, image_descriptors
             )
@@ -113,33 +139,45 @@ class VlcServer:
             if not self.strict_keypoint_evaluation:
                 # Since we just added the current image, we know that no keypoints
                 # or descriptors have been generated for it
-                image_keypoints = self.keypoint_model.infer(
+                image_keypoints, image_descriptors = self.keypoint_model.infer(
                     vlc_image.image, pose_hint=pose_hint
                 )
-                image_descriptors = self.descriptor_model.infer(
-                    vlc_image.image, image_keypoints, pose_hint=pose_hint
-                )
+                if image_descriptors is None:
+                    image_descriptors = self.descriptor_model.infer(
+                        vlc_image.image, image_keypoints, pose_hint=pose_hint
+                    )
                 vlc_image = self.vlc_db.update_keypoints(
                     img_id, image_keypoints, image_descriptors
                 )
 
             # The matched frame may not yet have any keypoints or descriptors.
             if image_match.keypoints is None:
-                keypoints = self.keypoint_model.infer(
+                keypoints, descriptors = self.keypoint_model.infer(
                     image_match.image, pose_hint=image_match.pose_hint
                 )
             else:
                 keypoints = image_match.keypoints
 
             if image_match.descriptors is None:
-                descriptors = self.descriptor_model.infer(
-                    image_match.image, keypoints, pose_hint=image_match.pose_hint
-                )
+                if descriptors is None:
+                    descriptors = self.descriptor_model.infer(
+                        image_match.image, keypoints, pose_hint=image_match.pose_hint
+                    )
                 image_match = self.vlc_db.update_keypoints(
                     image_match.metadata.image_uuid, keypoints, descriptors
                 )
 
+            # Match keypoints
+            img_kp_matched, stored_img_kp_matched = self.match_model.infer(
+                vlc_image, image_match
+            )
+            if self.display_keypoint_matches:
+                display_kp_match_pair(
+                    vlc_image, image_match, img_kp_matched, stored_img_kp_matched
+                )
+
             # 3. extract pose
+            # TODO: matched keypoints go into pose_estimate
             pose_estimate = self.pose_model.infer(vlc_image, image_match)
             lc = ob.SparkLoopClosure(
                 from_image_uuid=img_id,

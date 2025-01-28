@@ -25,7 +25,7 @@ def pose_from_quat_trans(q, t):
 class VlcPose:
     time_ns: int
     position: np.ndarray  # x,y,z
-    rotation: np.ndarray  # qx, qy, qz
+    rotation: np.ndarray  # qx, qy, qz, qw
 
     def to_descriptor(self):
         return np.hstack([[self.time_ns], self.position, self.rotation])
