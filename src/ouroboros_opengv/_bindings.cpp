@@ -19,11 +19,10 @@ using opengv::sac_problems::point_cloud::PointCloudSacProblem;
 using RelativePoseProblem = opengv::sac_problems::relative_pose::CentralRelativePoseSacProblem;
 using AbsolutePoseProblem = opengv::sac_problems::absolute_pose::AbsolutePoseSacProblem;
 
-using Vec3Matrix = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-using PyVec3Matrix = Eigen::Ref<const Vec3Matrix>;
+using PyVec3Matrix = Eigen::Ref<const Eigen::Matrix<double, 3, Eigen::Dynamic>>;
 
-inline void checkInputs(const Vec3Matrix& m1,
-                        const Vec3Matrix& m2,
+inline void checkInputs(const PyVec3Matrix& m1,
+                        const PyVec3Matrix& m2,
                         const std::string& m1_name,
                         const std::string& m2_name) {
   if (m1.cols() == m2.cols()) {
@@ -37,7 +36,7 @@ inline void checkInputs(const Vec3Matrix& m1,
   throw std::invalid_argument(ss.str());
 }
 
-// NOTE(nathan) we don't both exposing priors for 2d-2d
+// NOTE(nathan) we don't expose priors for 2d-2d
 struct EigenRelativeAdaptor : public RelativeAdapterBase {
   EigenRelativeAdaptor(const PyVec3Matrix _src, const PyVec3Matrix _dest)
       : RelativeAdapterBase(Eigen::Vector3d::Zero(), Eigen::Matrix3d::Identity()), src(_src), dest(_dest) {
@@ -66,17 +65,10 @@ struct EigenRelativeAdaptor : public RelativeAdapterBase {
 };
 
 struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
-  EigenAbsoluteAdaptor(const Vec3Matrix& bearings, const Vec3Matrix& points)
-      : EigenAbsoluteAdaptor(bearings, points, Eigen::Matrix3d::Identity()) {}
-
-  EigenAbsoluteAdaptor(const Vec3Matrix& bearings, const Vec3Matrix& points, const Eigen::Matrix3d& rotation_prior)
-      : EigenAbsoluteAdaptor(bearings, points, rotation_prior, Eigen::Vector3d::Zero()) {}
-
-  EigenAbsoluteAdaptor(const Vec3Matrix& _bearings,
-                       const Vec3Matrix& _points,
-                       const Eigen::Matrix3d& rotation_prior,
-                       const Eigen::Vector3d& translation_prior)
-      : AbsoluteAdapterBase(translation_prior, rotation_prior), bearings(_bearings), points(_points) {
+  EigenAbsoluteAdaptor(const PyVec3Matrix& _bearings,
+                       const PyVec3Matrix& _points,
+                       const Eigen::Matrix3d& rotation_prior = Eigen::Matrix3d::Identity())
+      : AbsoluteAdapterBase(Eigen::Vector3d::Zero(), rotation_prior), bearings(_bearings), points(_points) {
     checkInputs(bearings, points, "bearings", "points");
   }
 
@@ -93,21 +85,15 @@ struct EigenAbsoluteAdaptor : public AbsoluteAdapterBase {
 
   size_t getNumberCorrespondences() const override { return bearings.cols(); }
 
-  Vec3Matrix bearings;
-  Vec3Matrix points;
+  const PyVec3Matrix bearings;
+  const PyVec3Matrix points;
 };
 
 struct EigenPointCloudAdaptor : public PointCloudAdapterBase {
-  EigenPointCloudAdaptor(const Vec3Matrix& src, const Vec3Matrix& dest)
-      : EigenPointCloudAdaptor(src, dest, Eigen::Matrix3d::Identity()) {}
-
-  EigenPointCloudAdaptor(const Vec3Matrix& src, const Vec3Matrix& dest, const Eigen::Matrix3d& rotation_prior)
-      : EigenPointCloudAdaptor(src, dest, rotation_prior, Eigen::Vector3d::Zero()) {}
-
-  EigenPointCloudAdaptor(const Vec3Matrix& _src,
-                         const Vec3Matrix& _dest,
-                         const Eigen::Matrix3d& rotation_prior,
-                         const Eigen::Vector3d& translation_prior)
+  EigenPointCloudAdaptor(const PyVec3Matrix _src,
+                         const PyVec3Matrix _dest,
+                         const Eigen::Matrix3d& rotation_prior = Eigen::Matrix3d::Identity(),
+                         const Eigen::Vector3d& translation_prior = Eigen::Vector3d::Zero())
       : PointCloudAdapterBase(translation_prior, rotation_prior), src(_src), dest(_dest) {
     checkInputs(src, dest, "src_points", "dest_points");
   }
@@ -121,8 +107,8 @@ struct EigenPointCloudAdaptor : public PointCloudAdapterBase {
   // TODO(nathan) think about weighted correspondences
   double getWeight(size_t index) const override { return 1.0; }
 
-  Vec3Matrix src;
-  Vec3Matrix dest;
+  const PyVec3Matrix src;
+  const PyVec3Matrix dest;
 };
 
 struct RansacResult {
@@ -208,8 +194,8 @@ Args:
 
 Returns:
   _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
-      "src"_a.noconvert(),
-      "dest"_a.noconvert(),
+      "src"_a,
+      "dest"_a,
       "solver"_a = RelativePoseProblem::Algorithm::STEWENIUS,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
@@ -217,8 +203,8 @@ Returns:
 
   module.def(
       "solve_2d3d",
-      [](const Vec3Matrix& bearings,
-         const Vec3Matrix& points,
+      [](const PyVec3Matrix& bearings,
+         const PyVec3Matrix& points,
          AbsolutePoseProblem::Algorithm solver,
          size_t max_iterations,
          double threshold,
@@ -229,7 +215,6 @@ Returns:
         ransac.threshold_ = threshold;
         ransac.probability_ = probability;
         ransac.sac_model_ = std::make_shared<AbsolutePoseProblem>(adaptor, solver);
-
         if (!ransac.computeModel()) {
           return {};
         }
@@ -256,8 +241,47 @@ Returns:
       "probability"_a = 0.99);
 
   module.def(
+      "recover_translation_2d3d",
+      [](const PyVec3Matrix& bearings,
+         const PyVec3Matrix& points,
+         const Eigen::Matrix3d& dest_R_src,
+         size_t max_iterations,
+         double threshold,
+         double probability) -> RansacResult {
+        EigenAbsoluteAdaptor adaptor(bearings, points);
+        Ransac<AbsolutePoseProblem> ransac;
+        ransac.max_iterations_ = max_iterations;
+        ransac.threshold_ = threshold;
+        ransac.probability_ = probability;
+        ransac.sac_model_ = std::make_shared<AbsolutePoseProblem>(adaptor, AbsolutePoseProblem::Algorithm::TWOPT);
+        if (!ransac.computeModel()) {
+          return {};
+        }
+
+        return ransac;
+      },
+      R"(Recover metric translation from given rotation and bearing-landmark correspondences.
+
+Args:
+  bearings (numpy.ndarray[numpy.float64[3, n]]): Feature bearings arranged as (3, N) for the "src" input.
+  points (numpy.ndarray[numpy.float64[3, n]]): Corresponding points arranged as (3, N) for the "dest" input.
+  dest_R_src (numpy.ndarray[numpy.float64[3, 3]]): Given rotation.
+  max_iterations (int): Maximum RANSAC iterations.
+  threshold (float): Inlier error threshold.
+  probability (float): Likelihood that minimal indices contain at least one inlier.
+
+Returns:
+  _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
+      "bearings"_a,
+      "points"_a,
+      "dest_R_src"_a,
+      "max_iterations"_a = 1000,
+      "threshold"_a = 1.0e-2,
+      "probability"_a = 0.99);
+
+  module.def(
       "solve_3d3d",
-      [](const Vec3Matrix& src, const Vec3Matrix& dest, size_t max_iterations, double threshold, double probability)
+      [](const PyVec3Matrix& src, const PyVec3Matrix& dest, size_t max_iterations, double threshold, double probability)
           -> RansacResult {
         EigenPointCloudAdaptor adaptor(src, dest);
         Ransac<PointCloudSacProblem> ransac;
