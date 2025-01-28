@@ -1,6 +1,7 @@
 from typing import Optional
 
 import numpy as np
+
 from _ouroboros_opengv import Solver2d2d, Solver2d3d, solve_2d2d, solve_2d3d, solve_3d3d
 
 # TODO(nathan) use actual type alias once we move beyond 3.8
@@ -32,15 +33,16 @@ def get_bearings(K: Matrix3d, features: np.ndarray) -> np.ndarray:
 
     Args:
         K: Camera matrix for features.
-        features: Pixel coordinates in a 2xN matrix.
+        features: Pixel coordinates in a Nx2 matrix.
 
     Returns:
-        Bearing vectors in a 3xN matrix.
+        Bearing vectors in a Nx3 matrix.
     """
     K_inv = inverse_camera_matrix(K)
-    bearings = np.vstack((features, np.ones(features.shape[1])))
-    bearings = K_inv @ bearings
-    bearings /= np.linalg.norm(bearings, axis=0)
+    bearings = np.hstack((features, np.ones((features.shape[0], 1))))
+    bearings = bearings @ K_inv.T
+    # for broadcasting to be correct needs to be [N, 1] to divide rowwise
+    bearings /= np.linalg.norm(bearings, axis=1)[..., np.newaxis]
     return bearings
 
 
@@ -66,10 +68,10 @@ def recover_pose_opengv(
     Returns:
         match_T_query if underlying solver is successful.
     """
-    query_bearings = get_bearings(K_query, query_features[:, correspondences[:, 0]])
-    match_bearings = get_bearings(K_match, match_features[:, correspondences[:, 1]])
+    query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
+    match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
     # order is src (query), dest (match) for dest_T_src (match_T_query)
-    result = solve_2d2d(query_bearings, match_bearings, solver=solver)
+    result = solve_2d2d(query_bearings.T, match_bearings.T, solver=solver)
     if not result:
         return None
 

@@ -4,7 +4,7 @@ BasedOnStyle: Google
 Language: Cpp
 DerivePointerAlignment: false
 PointerAlignment: Left
-ColumnLimit: 88
+ColumnLimit: 120
 BinPackArguments: false
 BinPackParameters: false
 ---
