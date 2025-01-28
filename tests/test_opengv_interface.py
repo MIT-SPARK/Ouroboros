@@ -16,7 +16,7 @@ def test_inverse_camera_matrix():
 def test_bearings():
     """Check that bearing math is correct."""
     K = np.array([[10.0, 0.0, 5.0], [0.0, 5.0, 2.5], [0.0, 0.0, 1.0]])
-    features = np.array([[5.0, 2.5], [15.0, 2.5], [5.0, -2.5]]).T
+    features = np.array([[5.0, 2.5], [15.0, 2.5], [5.0, -2.5]])
     bearings = ogv.get_bearings(K, features)
     expected = np.array(
         [
@@ -24,19 +24,23 @@ def test_bearings():
             [1.0 / np.sqrt(2), 0.0, 1.0 / np.sqrt(2)],
             [0.0, -1.0 / np.sqrt(2), 1.0 / np.sqrt(2)],
         ]
-    ).T
+    )
+    with np.printoptions(suppress=True):
+        print(f"expect:\n{expected}")
+        print(f"bearings:\n{bearings}")
+
     assert bearings == pytest.approx(expected)
 
 
 def _shuffle_features(features):
-    indices = np.arange(features.shape[1])
+    indices = np.arange(features.shape[0])
     np.random.shuffle(indices)
-    return indices, features[:, indices].copy()
+    return indices, features[indices, :].copy()
 
 
 def test_solver():
     """Test that two-view geometry is called correct."""
-    query_features = np.random.normal(size=(2, 100))
+    query_features = np.random.normal(size=(100, 2))
     query_bearings = ogv.get_bearings(np.eye(3), query_features)
 
     yaw = np.pi / 4.0
@@ -48,10 +52,10 @@ def test_solver():
         ]
     )
     match_t_query = np.array([1.0, -1.2, 0.8]).reshape((3, 1))
-    match_bearings = match_R_query @ query_bearings + match_t_query
-    match_features = match_bearings[:2, :] / match_bearings[2, :]
+    match_bearings = query_bearings @ match_R_query.T + match_t_query.T
+    match_features = match_bearings[:, :2] / match_bearings[:, 2, np.newaxis]
 
-    indices = np.arange(query_bearings.shape[1])
+    indices = np.arange(query_bearings.shape[0])
     new_indices, match_features = _shuffle_features(match_features)
 
     # needs to be query -> match (so need indices that were used by shuffle for query)
