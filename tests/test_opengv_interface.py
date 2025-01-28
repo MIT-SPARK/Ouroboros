@@ -74,3 +74,51 @@ def test_solver():
     t_result = np.squeeze(match_T_query[:3, 3] / np.linalg.norm(match_T_query[:3, 3]))
     assert match_T_query[:3, :3] == pytest.approx(match_R_query)
     assert t_result == pytest.approx(t_expected)
+
+
+def test_metric_solver():
+    """Test that two-view geometry is called correct."""
+    query_features = np.random.normal(size=(100, 2))
+    query_bearings = ogv.get_bearings(np.eye(3), query_features)
+
+    yaw = np.pi / 4.0
+    match_R_query = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(yaw), -np.sin(yaw)],
+            [0.0, np.sin(yaw), np.cos(yaw)],
+        ]
+    )
+    match_t_query = np.array([1.0, -1.2, 0.8]).reshape((3, 1))
+    match_bearings = query_bearings @ match_R_query.T + match_t_query.T
+    match_features = match_bearings[:, :2] / match_bearings[:, 2, np.newaxis]
+    expected = np.eye(4)
+    expected[:3, :3] = match_R_query
+    expected[:3, 3] = np.squeeze(match_t_query)
+
+    indices = np.arange(query_bearings.shape[0])
+    new_indices, match_features = _shuffle_features(match_features)
+
+    # needs to be query -> match (so need indices that were used by shuffle for query)
+    correspondences = np.vstack((new_indices, indices)).T
+
+    match_T_query = ogv.recover_metric_pose_opengv(
+        np.eye(3),
+        query_features,
+        np.eye(3),
+        match_features,
+        np.random.uniform(0.5, 1.5, 100),
+        correspondences,
+        solver=ogv.Solver2d2d.NISTER,
+    )
+
+    # t_expected = np.squeeze(match_t_query / np.linalg.norm(match_t_query))
+    t_expected = match_t_query
+    # t_result = np.squeeze(match_T_query[:3, 3] / np.linalg.norm(match_T_query[:3, 3]))
+    t_result = np.squeeze(match_T_query[:3, 3])
+    with np.printoptions(suppress=True):
+        print(f"expected:\n{expected}")
+        print(f"result:\n{match_T_query}")
+
+    assert match_T_query[:3, :3] == pytest.approx(match_R_query)
+    assert t_result == pytest.approx(t_expected)
