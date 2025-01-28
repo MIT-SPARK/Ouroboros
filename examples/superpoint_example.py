@@ -5,7 +5,7 @@ import numpy as np
 import imageio.v3 as iio
 
 import ouroboros as ob
-from ouroboros_keypoints.superpoint_interface import get_superpoint_model
+from ouroboros_keypoints.superpoint_interface import SuperPointModel
 
 
 def resource_dir():
@@ -13,7 +13,7 @@ def resource_dir():
 
 
 if __name__ == "__main__":
-    model = get_superpoint_model()
+    model = SuperPointModel.load("superpoint_config.yaml")
 
     # img_d = iio.imread(resource_dir() / "arch.jpg")
     img_d = iio.imread(resource_dir() / "right_img_1.png")

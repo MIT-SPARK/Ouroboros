@@ -1,9 +1,11 @@
+from __future__ import annotations
+from dataclasses import dataclass
 import ouroboros as ob
+from ouroboros.config import register_config, Config
 
 
-class OuroborosGtMatches:
-    def __init__(self, model):
-        self.model = model
+class GtMatchModel:
+    def __init__(self, config: GtMatchModelConfig):
         self.returns_descriptors = True
 
     def infer(
@@ -12,5 +14,7 @@ class OuroborosGtMatches:
         return None
 
 
-def get_gt_match_model():
-    return OuroborosGtMatches()
+@register_config("match_model", name="ground_truth", constructor=GtMatchModel)
+@dataclass
+class GtMatchModelConfig(Config):
+    pass

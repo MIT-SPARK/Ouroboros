@@ -1,0 +1,6 @@
+a_number: 1
+another_number: 2
+a_string: "test"
+a_virtual_subconfig:
+    type: "mouse"
+    color: "gray"

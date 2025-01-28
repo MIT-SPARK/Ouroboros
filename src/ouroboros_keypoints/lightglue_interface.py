@@ -1,12 +1,15 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from ouroboros.config import register_config, Config
 from lightglue import LightGlue
 import ouroboros as ob
 import torch
 import numpy as np
 
 
-class OuroborosLightGlueWrapper:
-    def __init__(self, model):
-        self.model = model
+class LightglueModel:
+    def __init__(self, config: LightglueModelConfig):
+        self.model = LightGlue(features=config.feature_type).eval().cuda()
         self.returns_descriptors = True
 
     def infer(
@@ -34,8 +37,13 @@ class OuroborosLightGlueWrapper:
         )
         return m_kpts0, m_kpts1
 
+    @classmethod
+    def load(cls, path):
+        config = ob.config.Config.load(LightglueModelConfig, path)
+        return cls(config)
 
-def get_lightglue_model():
-    # Magically loads some weights from torchub
-    model = LightGlue(features="superpoint").eval().cuda()
-    return OuroborosLightGlueWrapper(model)
+
+@register_config("match_model", name="Lightglue", constructor=LightglueModel)
+@dataclass
+class LightglueModelConfig(Config):
+    feature_type: str = "superpoint"

@@ -1,12 +1,15 @@
+from __future__ import annotations
+from dataclasses import dataclass
 from lightglue import SuperPoint
 import ouroboros as ob
 import torch
 import numpy as np
+from ouroboros.config import Config, register_config
 
 
-class OuroborosSuperPointWrapper:
-    def __init__(self, model):
-        self.model = model
+class SuperPointModel:
+    def __init__(self, config: SuperPointModelConfig):
+        self.model = SuperPoint(max_num_keypoints=config.max_keypoints).eval().cuda()
         self.returns_descriptors = True
 
     def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose = None):
@@ -21,8 +24,13 @@ class OuroborosSuperPointWrapper:
             "descriptors"
         ].cpu().numpy()[0]
 
+    @classmethod
+    def load(cls, path: str):
+        config = ob.config.Config.load(SuperPointModelConfig, path)
+        return cls(config)
 
-def get_superpoint_model(max_keypoints=1024):
-    # Magically loads some weights from torchub
-    model = SuperPoint(max_num_keypoints=max_keypoints).eval().cuda()
-    return OuroborosSuperPointWrapper(model)
+
+@register_config("keypoint_model", name="SuperPoint", constructor=SuperPointModel)
+@dataclass
+class SuperPointModelConfig(Config):
+    max_keypoints: int = 1024

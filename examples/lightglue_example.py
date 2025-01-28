@@ -5,8 +5,8 @@ import numpy as np
 import imageio.v3 as iio
 
 import ouroboros as ob
-from ouroboros_keypoints.superpoint_interface import get_superpoint_model
-from ouroboros_keypoints.lightglue_interface import get_lightglue_model
+from ouroboros_keypoints.superpoint_interface import SuperPointModel
+from ouroboros_keypoints.lightglue_interface import LightglueModel
 from lightglue.viz2d import plot_images, plot_matches
 from ouroboros.utils.plotting_utils import display_kp_match_pair
 
@@ -16,8 +16,8 @@ def resource_dir():
 
 
 if __name__ == "__main__":
-    superpoint_model = get_superpoint_model(max_keypoints=128)
-    lightglue_model = get_lightglue_model()
+    superpoint_model = SuperPointModel.load("config/superpoint_config.yaml")
+    lightglue_model = LightglueModel.load("config/lightglue_config.yaml")
 
     img_l = iio.imread(resource_dir() / "left_img_1.png")
     img_l = np.expand_dims(img_l, axis=-1)
@@ -40,13 +40,13 @@ if __name__ == "__main__":
     plt.title("left")
     plt.imshow(img_l)
     x, y = m_keypoints_l.T
-    plt.scatter(y, x)
+    plt.scatter(x, y)
 
     plt.figure()
     plt.title("right")
     plt.imshow(img_r)
     x, y = m_keypoints_r.T
-    plt.scatter(y, x)
+    plt.scatter(x, y)
 
     plt.figure()
     plot_images([img_l, img_r], titles=["left", "right"])

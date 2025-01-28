@@ -37,6 +37,9 @@ def plot_lc(lc, image_to_pose):
     )
 
 
+plugins = ob.discover_plugins()
+print(plugins)
+
 data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
 rgb_topic = "/tesse/left_cam/rgb/image_raw"
 rgb_info_topic = "/tesse/left_cam/camera_info"
@@ -52,30 +55,16 @@ images = None  # numpy array
 poses = None  # 7d vector
 
 vlc_frame_period_s = 0.5
-lc_recent_pose_lockout_s = 15
-lc_similarity_threshold = 0.55
-
-place_method = "salad"
-keypoint_method = "superpoint"
-descriptor_method = None
-match_method = "lightglue"
-pose_method = "ground_truth"
 
 images_to_pose = {}
 last_vlc_frame_time = None
 
+server_config = ob.VlcServerConfig.load("config/vlc_server_config.yaml")
 
 robot_id = 0
 vlc_server = ob.VlcServer(
-    place_method,
-    keypoint_method,
-    descriptor_method,
-    match_method,
-    pose_method,
-    lc_recent_pose_lockout_s * 1e9,
-    lc_similarity_threshold,
+    server_config,
     robot_id=robot_id,
-    strict_keypoint_evaluation=True,
 )
 
 plt.ion()

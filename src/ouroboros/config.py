@@ -114,7 +114,8 @@ class ConfigFactory:
         """Instantiate a specific config."""
         instance = ConfigFactory()
         if category not in instance._factories:
-            raise ValueError(f"No configs registered under category '{category}'")
+            print(f"WARNING: No configs registered under category '{category}'")
+            return None
 
         category_factories = instance._factories[category]
         if name not in category_factories:
@@ -181,7 +182,8 @@ class VirtualConfig:
         if not self._config:
             self._create(validate=False)
             if not self._config:
-                return {}
+                # return {}
+                return None
 
         # TODO(nathan) this is janky
         values = self._config.dump()
@@ -190,24 +192,30 @@ class VirtualConfig:
 
     def update(self, config_data):
         """Update config struct."""
-        try:
-            typename = config_data.get("type")
-        except Exception:
-            # Logger.error(f"Could not get type for {self} from '{config_data}'")
+
+        if config_data is None:
             typename = None
+        else:
+            try:
+                typename = config_data.get("type")
+            except Exception:
+                # Logger.error(f"Could not get type for {self} from '{config_data}'")
+                raise Exception(f"Could not get type for {self} from '{config_data}'")
 
         type_changed = typename is not None and self._type != typename
         if not self._config or type_changed:
             self._create(typename=typename)
 
-        self._config.update(config_data)
+        if self._config is None and config_data is not None:
+            self._config.update(config_data)
 
     def create(self, *args, **kwargs):
         """Call constructor with config."""
         name = self._get_curr_typename()
         constructor = ConfigFactory.get_constructor(self.category, name)
         if not constructor:
-            raise ValueError(f"constructor not specified for {self}")
+            print(f"WARNING: constructor not specified for {self}")
+            return None
 
         if not self._config:
             self._create()
