@@ -6,7 +6,6 @@ from typing import Any, List, Optional, Tuple
 
 import ouroboros as ob
 from ouroboros.config import Config, config_field, register_config
-from ouroboros.utils.plotting_utils import display_image_pair, display_kp_match_pair
 
 
 class VlcServer:
@@ -17,9 +16,6 @@ class VlcServer:
     ):
         self.lc_frame_lockout_ns = config.lc_frame_lockout_s * 1e9
         self.place_match_threshold = config.place_match_threshold
-
-        self.display_place_matches = config.display_place_matches
-        self.display_keypoint_matches = config.display_keypoint_matches
 
         self.strict_keypoint_evaluation = config.strict_keypoint_evaluation
 
@@ -33,6 +29,7 @@ class VlcServer:
 
         self.match_model = config.match_method.create()
         self.pose_model = config.pose_method.create()
+        self.display_method = config.display_method.create()
 
         self.vlc_db = ob.VlcDb(self.place_model.embedding_size)
         self.session_id = self.vlc_db.add_session(robot_id)
@@ -73,12 +70,11 @@ class VlcServer:
         else:
             image_match = image_matches[0]
 
-        if self.display_place_matches:
-            if image_match is None:
-                right = None
-            else:
-                right = image_match.image.rgb
-            display_image_pair(vlc_image.image.rgb, right)
+        if image_match is None:
+            right = None
+        else:
+            right = image_match.image.rgb
+        self.display_method.display_image_pair(vlc_image.image.rgb, right)
 
         # TODO: support multiple possible place descriptor matches
         if image_match is not None:
@@ -117,10 +113,9 @@ class VlcServer:
             img_kp_matched, stored_img_kp_matched = self.match_model.infer(
                 vlc_image, image_match
             )
-            if self.display_keypoint_matches:
-                display_kp_match_pair(
-                    vlc_image, image_match, img_kp_matched, stored_img_kp_matched
-                )
+            self.display_method.display_kp_match_pair(
+                vlc_image, image_match, img_kp_matched, stored_img_kp_matched
+            )
 
             # 3. extract pose
             # TODO: matched keypoints go into pose_estimate
@@ -159,9 +154,34 @@ class VlcServerConfig(Config):
     lc_frame_lockout_s: int = 10
     place_match_threshold: float = 0.5
     strict_keypoint_evaluation: bool = False
-    display_place_matches: bool = True
-    display_keypoint_matches: bool = True
+    display_method: Any = config_field("vlc_server_display", default="opencv")
 
     @classmethod
     def load(cls, path: str):
         return ob.config.Config.load(VlcServerConfig, path)
+
+
+class VlcServerOpenCvDisplay:
+    def __init__(self, config: VlcServerOpenCvDisplay):
+        self.config = config
+
+    def display_image_pair(self, left: ob.SparkImage, right: ob.SparkImage):
+        if self.config.display_place_matches:
+            ob.utils.plotting_utils.display_image_pair(left, right)
+
+    def display_kp_match_pair(
+        self, left: ob.VlcImage, right: ob.VlcImage, left_kp, right_kp
+    ):
+        if self.config.display_keypoint_matches:
+            ob.utils.plotting_utils.display_kp_match_pair(
+                left, right, left_kp, right_kp
+            )
+
+
+@register_config(
+    "vlc_server_display", name="opencv", constructor=VlcServerOpenCvDisplay
+)
+@dataclass
+class VlcServerOpenCvDisplayConfig(Config):
+    display_place_matches: bool = True
+    display_keypoint_matches: bool = True

@@ -56,8 +56,8 @@ vlc_frame_period_s = 0.5
 images_to_pose = {}
 last_vlc_frame_time = None
 
-server_config = ob.VlcServerConfig.load("config/gt_vlc_server_config.yaml")
-# server_config = ob.VlcServerConfig.load("config/vlc_server_config.yaml")
+# server_config = ob.VlcServerConfig.load("config/gt_vlc_server_config.yaml")
+server_config = ob.VlcServerConfig.load("config/vlc_server_config.yaml")
 print("server config: ")
 print(server_config)
 
