@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
@@ -10,147 +11,137 @@ from _ouroboros_opengv import (
     solve_2d3d,
     solve_3d3d,
 )
+from ouroboros.config import Config
+from ouroboros.pose_recovery import get_bearings, get_points
 
-# TODO(nathan) use actual type alias once we move beyond 3.8
-# Matrix3d = np.ndarray[np.float64[3, 3]]
 Matrix3d = np.ndarray
 
 
-def inverse_camera_matrix(K: Matrix3d) -> Matrix3d:
+@dataclass
+class RansacConfig(Config):
     """
-    Get inverse camera matrix.
+    RANSAC parameters used when recovering pose.
 
-    Args:
-        K: Original camera matrix.
-
-    Returns:
-        Inverted camera matrix that takes pixel space coordinates to unit coordinates.
+    Attributes:
+        max_iterations: Maximum number of RANSAC iterations to perform
+        inlier_tolerance: Inlier reprojection tolerance for model-fitting
+        inlier_probability: Probability of drawing at least one inlier during model selection
+        min_inliers: Minimum number of inliers
     """
-    K_inv = np.eye(3)
-    K_inv[0, 0] = 1.0 / K[0, 0]
-    K_inv[1, 1] = 1.0 / K[1, 1]
-    K_inv[0, 2] = -K[0, 2] / K[0, 0]
-    K_inv[1, 2] = -K[1, 2] / K[1, 1]
-    return K_inv
+
+    max_iterations: int = 1000
+    inlier_tolerance: float = 1.0e-2
+    inlier_probability: float = 0.99
+    min_inliers: int = 10
 
 
-def get_bearings(K: Matrix3d, features: np.ndarray) -> np.ndarray:
+@dataclass
+class OpenGVPoseRecoveryConfig(Config):
     """
-    Get bearings for undistorted features in pixel space.
+    Config for pose recovery.
 
-    Args:
-        K: Camera matrix for features.
-        features: Pixel coordinates in a Nx2 matrix.
-
-    Returns:
-        Bearing vectors in a Nx3 matrix.
+    Attributes:
+        solver: 2D-2D initial solver to use [STEWENIUS, NISTER, SEVENPT, EIGHTPT]
+        ransac: RANSAC parameters for 2D-2D solver
+        scale_recovery: Attempt to recover translation scale if possible
+        use_pnp_for_scale: Toggles between P2P and Arun's method for scale recovery
+        scale_ransac: RANSAC parameters for translation recovery
+        min_cosine_similarity: Minimum similarity threshold to translation w/o scale
     """
-    K_inv = inverse_camera_matrix(K)
-    bearings = np.hstack((features, np.ones((features.shape[0], 1))))
-    bearings = bearings @ K_inv.T
-    # for broadcasting to be correct needs to be [N, 1] to divide rowwise
-    bearings /= np.linalg.norm(bearings, axis=1)[..., np.newaxis]
-    return bearings
+
+    solver: str = "STEWENIUS"
+    ransac: RansacConfig = RansacConfig()
+    scale_recovery: bool = True
+    use_pnp_for_scale: bool = True
+    scale_ransac: RansacConfig = RansacConfig()
+    min_cosine_similarity: float = 0.8
 
 
-def get_points(K: Matrix3d, features: np.ndarray, depths) -> np.ndarray:
-    """
-    Get bearings for undistorted features in pixel space.
+class OpenGVPoseRecovery:
+    """Class for performing pose recovery."""
 
-    Args:
-        K: Camera matrix for features.
-        features: Pixel coordinates in a Nx2 matrix.
+    def __init__(self, config: OpenGVPoseRecoveryConfig):
+        """Initialize the opengv pose recovery class via a config."""
+        self._config = config
 
-    Returns:
-        Bearing vectors in a Nx3 matrix.
-    """
-    K_inv = inverse_camera_matrix(K)
-    versors = np.hstack((features, np.ones((features.shape[0], 1))))
-    versors = versors @ K_inv.T
-    return versors * depths[..., np.newaxis]
+    def recover_pose(
+        self,
+        K_query: Matrix3d,
+        query_features: np.ndarray,
+        K_match: Matrix3d,
+        match_features: np.ndarray,
+        correspondences: np.ndarray,
+    ) -> Optional[np.ndarray]:
+        """
+        Recover pose up to scale from 2d correspondences.
 
+        Args:
+            K_query: Camera matrix for query features.
+            query_features: 2xN matrix of pixel features for query frame.
+            K_match: Camera matrix for match features.
+            match_features: 2xN matrix of pixel feature for match frame.
+            correspondences: Nx2 indices of feature matches (query -> match)
+            solver: Underlying 2d2d algorithm.
 
-def recover_pose_opengv(
-    K_query: Matrix3d,
-    query_features: np.ndarray,
-    K_match: Matrix3d,
-    match_features: np.ndarray,
-    correspondences: np.ndarray,
-    solver=Solver2d2d.STEWENIUS,
-) -> Optional[np.ndarray]:
-    """
-    Recover pose up to scale from 2d correspondences.
+        Returns:
+            match_T_query if underlying solver is successful.
+        """
+        query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
+        match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
+        # order is src (query), dest (match) for dest_T_src (match_T_query)
+        result = solve_2d2d(
+            query_bearings.T, match_bearings.T, solver=self._config.solver
+        )
+        if not result:
+            return None
 
-    Args:
-        K_query: Camera matrix for query features.
-        query_features: 2xN matrix of pixel features for query frame.
-        K_match: Camera matrix for match features.
-        match_features: 2xN matrix of pixel feature for match frame.
-        correspondences: Nx2 indices of feature matches (query -> match)
-        solver: Underlying 2d2d algorithm.
+        match_T_query = result.dest_T_src
+        return match_T_query
 
-    Returns:
-        match_T_query if underlying solver is successful.
-    """
-    query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
-    match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
-    # order is src (query), dest (match) for dest_T_src (match_T_query)
-    result = solve_2d2d(query_bearings.T, match_bearings.T, solver=solver)
-    if not result:
-        return None
+    def recover_metric_pose(
+        self,
+        K_query: Matrix3d,
+        query_features: np.ndarray,
+        K_match: Matrix3d,
+        match_features: np.ndarray,
+        match_depths: np.ndarray,
+        correspondences: np.ndarray,
+    ) -> Optional[np.ndarray]:
+        """
+        Recover pose up to scale from 2d correspondences.
 
-    match_T_query = result.dest_T_src
-    return match_T_query
+        Args:
+            K_query: Camera matrix for query features.
+            query_features: Nx2 matrix of pixel features for query frame.
+            K_match: Camera matrix for match features.
+            match_features: Nx2 matrix of pixel feature for match frame.
+            match_depths: N depths for each pixel
+            correspondences: Nx2 indices of feature matches (query -> match)
+            solver: Underlying 2d2d algorithm.
 
+        Returns:
+            match_T_query if underlying solver is successful.
+        """
+        query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
+        match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
+        # order is src (query), dest (match) for dest_T_src (match_T_query)
+        result = solve_2d2d(
+            query_bearings.T, match_bearings.T, solver=self._config.solver
+        )
 
-def recover_metric_pose_opengv(
-    K_query: Matrix3d,
-    query_features: np.ndarray,
-    K_match: Matrix3d,
-    match_features: np.ndarray,
-    match_depths: np.ndarray,
-    correspondences: np.ndarray,
-    solver=Solver2d2d.STEWENIUS,
-) -> Optional[np.ndarray]:
-    """
-    Recover pose up to scale from 2d correspondences.
+        if not result:
+            return None
 
-    Args:
-        K_query: Camera matrix for query features.
-        query_features: Nx2 matrix of pixel features for query frame.
-        K_match: Camera matrix for match features.
-        match_features: Nx2 matrix of pixel feature for match frame.
-        match_depths: N depths for each pixel
-        correspondences: Nx2 indices of feature matches (query -> match)
-        solver: Underlying 2d2d algorithm.
+        # TODO(nathan) handle masking invalid depth
+        dest_R_src = result.dest_T_src[:3, :3]
+        match_points = get_points(
+            K_match,
+            match_features[correspondences[:, 1], :],
+            match_depths[correspondences[:, 1]],
+        )
 
-    Returns:
-        match_T_query if underlying solver is successful.
-    """
-    query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
-    match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
-    # order is src (query), dest (match) for dest_T_src (match_T_query)
-    result = solve_2d2d(query_bearings.T, match_bearings.T, solver=solver)
-    with np.printoptions(suppress=True):
-        print(f"2d2d (inliers: {len(result.inliers)}):\n{result.dest_T_src}")
+        result = recover_translation_2d3d(query_bearings.T, match_points.T, dest_R_src)
+        if not result:
+            return None  # TODO(nathan) handle failure with state enum
 
-    if not result:
-        return None
-
-    # TODO(nathan) handle masking invalid depth
-    dest_R_src = result.dest_T_src[:3, :3]
-    match_points = get_points(
-        K_match,
-        match_features[correspondences[:, 1], :],
-        match_depths[correspondences[:, 1]],
-    )
-    with np.printoptions(suppress=True):
-        print(f"bearings:\n{query_bearings}")
-        print(f"matches:\n{match_points}")
-
-    result = recover_translation_2d3d(query_bearings.T, match_points.T, dest_R_src)
-    if not result:
-        return None  # TODO(nathan) handle failure with state enum
-
-    print(result.inliers)
-    return result.dest_T_src
+        return result.dest_T_src
