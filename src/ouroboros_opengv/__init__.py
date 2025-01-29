@@ -131,6 +131,9 @@ def recover_metric_pose_opengv(
     match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
     # order is src (query), dest (match) for dest_T_src (match_T_query)
     result = solve_2d2d(query_bearings.T, match_bearings.T, solver=solver)
+    with np.printoptions(suppress=True):
+        print(f"2d2d (inliers: {len(result.inliers)}):\n{result.dest_T_src}")
+
     if not result:
         return None
 
@@ -141,5 +144,18 @@ def recover_metric_pose_opengv(
         match_features[correspondences[:, 1], :],
         match_depths[correspondences[:, 1]],
     )
-    result = recover_translation_2d3d(query_bearings.T, match_points.T, dest_R_src.T)
-    return None if not result else result.dest_T_src
+    with np.printoptions(suppress=True):
+        print(f"bearings:\n{query_bearings}")
+        print(f"matches:\n{match_points}")
+
+    result = recover_translation_2d3d(
+        query_bearings.T, match_points.T, dest_R_src, threshold=1.0e-2
+    )
+    if not result:
+        return None  # TODO(nathan) handle failure with state enum
+
+    print(result.inliers)
+    dest_T_src = np.eye(4)
+    dest_T_src[:3, :3] = dest_R_src
+    dest_T_src[:3, 3] = result.dest_T_src[:3, 3]
+    return dest_T_src

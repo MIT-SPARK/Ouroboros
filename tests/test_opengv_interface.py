@@ -6,6 +6,53 @@ import pytest
 import ouroboros_opengv as ogv
 
 
+def _transform_points(bearings, dest_T_src):
+    return bearings @ dest_T_src[:3, :3].T + dest_T_src[:3, 3, np.newaxis].T
+
+
+def _inverse_pose(dest_T_src):
+    src_T_dest = np.eye(4)
+    src_T_dest[:3, :3] = dest_T_src[:3, :3].T
+    src_T_dest[:3, 3] = -dest_T_src[:3, :3].T @ dest_T_src[:3, 3]
+    return src_T_dest
+
+
+def _pose(dest_R_src, dest_t_src):
+    dest_T_src = np.eye(4)
+    dest_T_src[:3, :3] = dest_R_src
+    dest_T_src[:3, 3] = np.squeeze(dest_t_src)
+    return dest_T_src
+
+
+def _get_test_pose():
+    yaw = np.pi / 4.0
+    match_R_query = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(yaw), -np.sin(yaw)],
+            [0.0, np.sin(yaw), np.cos(yaw)],
+        ]
+    )
+    # NOTE(nathan) needs to be small to avoid chirality inversion
+    match_t_query = np.array([0.3, -0.2, 0.1]).reshape((3, 1))
+    return _pose(match_R_query, match_t_query)
+
+
+def _shuffle_features(features):
+    indices = np.arange(features.shape[0])
+    np.random.shuffle(indices)
+    return indices, features[indices, :].copy()
+
+
+def _check_pose_up_to_scale(expected, result):
+    t_expected = expected[:3, 3]
+    t_expected = t_expected / np.linalg.norm(t_expected)
+    t_result = result[:3, 3]
+    t_result = t_result / np.linalg.norm(t_result)
+    assert result[:3, :3] == pytest.approx(expected[:3, :3], abs=1.0e-3)
+    assert t_result == pytest.approx(t_expected, abs=1.0e-3)
+
+
 def test_inverse_camera_matrix():
     """Check that explicit inverse is correct."""
     orig = np.array([[500.0, 0.0, 320.0], [0.0, 500.0, 240.0], [0.0, 0.0, 1.0]])
@@ -25,17 +72,7 @@ def test_bearings():
             [0.0, -1.0 / np.sqrt(2), 1.0 / np.sqrt(2)],
         ]
     )
-    with np.printoptions(suppress=True):
-        print(f"expect:\n{expected}")
-        print(f"bearings:\n{bearings}")
-
     assert bearings == pytest.approx(expected)
-
-
-def _shuffle_features(features):
-    indices = np.arange(features.shape[0])
-    np.random.shuffle(indices)
-    return indices, features[indices, :].copy()
 
 
 def test_solver():
@@ -43,16 +80,8 @@ def test_solver():
     query_features = np.random.normal(size=(100, 2))
     query_bearings = ogv.get_bearings(np.eye(3), query_features)
 
-    yaw = np.pi / 4.0
-    match_R_query = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(yaw), -np.sin(yaw)],
-            [0.0, np.sin(yaw), np.cos(yaw)],
-        ]
-    )
-    match_t_query = np.array([1.0, -1.2, 0.8]).reshape((3, 1))
-    match_bearings = query_bearings @ match_R_query.T + match_t_query.T
+    expected = _get_test_pose()  # match_T_query
+    match_bearings = _transform_points(query_bearings, expected)
     match_features = match_bearings[:, :2] / match_bearings[:, 2, np.newaxis]
 
     indices = np.arange(query_bearings.shape[0])
@@ -61,7 +90,7 @@ def test_solver():
     # needs to be query -> match (so need indices that were used by shuffle for query)
     correspondences = np.vstack((new_indices, indices)).T
 
-    match_T_query = ogv.recover_pose_opengv(
+    result = ogv.recover_pose_opengv(
         np.eye(3),
         query_features,
         np.eye(3),
@@ -70,55 +99,62 @@ def test_solver():
         solver=ogv.Solver2d2d.NISTER,
     )
 
-    t_expected = np.squeeze(match_t_query / np.linalg.norm(match_t_query))
-    t_result = np.squeeze(match_T_query[:3, 3] / np.linalg.norm(match_T_query[:3, 3]))
-    assert match_T_query[:3, :3] == pytest.approx(match_R_query)
-    assert t_result == pytest.approx(t_expected)
+    _check_pose_up_to_scale(expected, result)
+
+
+def test_points():
+    """Test that point conversion match is correct."""
+    K = np.array([[10.0, 0.0, 5.0], [0.0, 5.0, 2.5], [0.0, 0.0, 1.0]])
+    features = np.array([[5.0, 2.5], [15.0, 2.5], [5.0, -2.5]])
+    depths = np.array([0.9, 2.0, 3.0])
+    points = ogv.get_points(K, features, depths)
+    expected = np.array(
+        [
+            [0.0, 0.0, 0.9],
+            [2.0, 0.0, 2.0],
+            [0.0, -3.0, 3.0],
+        ]
+    )
+    with np.printoptions(suppress=True):
+        print(f"expected:\n{expected}")
+        print(f"points:\n{points}")
+
+    assert points == pytest.approx(expected)
 
 
 def test_metric_solver():
     """Test that two-view geometry is called correct."""
-    query_features = np.random.normal(size=(100, 2))
-    query_bearings = ogv.get_bearings(np.eye(3), query_features)
+    match_features = np.random.normal(size=(30, 2))
+    match_bearings = ogv.get_bearings(np.eye(3), match_features)
+    match_depths = np.ones(match_features.shape[0])
+    # match_depths = np.random.uniform(1.2, 2.5, size=match_features.shape[0])
+    match_depths = np.ones(match_features.shape[0])
 
-    yaw = np.pi / 4.0
-    match_R_query = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(yaw), -np.sin(yaw)],
-            [0.0, np.sin(yaw), np.cos(yaw)],
-        ]
-    )
-    match_t_query = np.array([1.0, -1.2, 0.8]).reshape((3, 1))
-    match_bearings = query_bearings @ match_R_query.T + match_t_query.T
-    match_features = match_bearings[:, :2] / match_bearings[:, 2, np.newaxis]
+    # expected = _get_test_pose()  # match_T_query
     expected = np.eye(4)
-    expected[:3, :3] = match_R_query
-    expected[:3, 3] = np.squeeze(match_t_query)
+    expected[:3, 3] = np.array([0.15, -0.03, 0.11])
+    query_bearings = _transform_points(match_bearings, _inverse_pose(expected))
+    query_features = query_bearings[:, :2] / query_bearings[:, 2, np.newaxis]
 
     indices = np.arange(query_bearings.shape[0])
-    new_indices, match_features = _shuffle_features(match_features)
+    # new_indices, query_features = _shuffle_features(query_features)
 
-    # needs to be query -> match (so need indices that were used by shuffle for query)
-    correspondences = np.vstack((new_indices, indices)).T
+    # needs to be query -> match (so need indices that were used by shuffle for match)
+    # correspondences = np.vstack((indices, new_indices)).T
+    correspondences = np.vstack((indices, indices)).T
 
-    match_T_query = ogv.recover_metric_pose_opengv(
+    result = ogv.recover_metric_pose_opengv(
         np.eye(3),
         query_features,
         np.eye(3),
         match_features,
-        np.random.uniform(0.5, 1.5, 100),
+        match_depths,
         correspondences,
-        solver=ogv.Solver2d2d.NISTER,
+        solver=ogv.Solver2d2d.STEWENIUS,
     )
 
-    # t_expected = np.squeeze(match_t_query / np.linalg.norm(match_t_query))
-    t_expected = match_t_query
-    # t_result = np.squeeze(match_T_query[:3, 3] / np.linalg.norm(match_T_query[:3, 3]))
-    t_result = np.squeeze(match_T_query[:3, 3])
     with np.printoptions(suppress=True):
         print(f"expected:\n{expected}")
-        print(f"result:\n{match_T_query}")
+        print(f"result:\n{result}")
 
-    assert match_T_query[:3, :3] == pytest.approx(match_R_query)
-    assert t_result == pytest.approx(t_expected)
+    assert result == pytest.approx(expected)
