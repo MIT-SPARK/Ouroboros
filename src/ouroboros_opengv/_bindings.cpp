@@ -248,7 +248,7 @@ Returns:
          size_t max_iterations,
          double threshold,
          double probability) -> RansacResult {
-        EigenAbsoluteAdaptor adaptor(bearings, points);
+        EigenAbsoluteAdaptor adaptor(bearings, points, dest_R_src);
         Ransac<AbsolutePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
