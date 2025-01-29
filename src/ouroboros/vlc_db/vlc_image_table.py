@@ -51,7 +51,7 @@ class VlcImageTable:
         self,
         embeddings: np.ndarray,
         k: int,
-        distance_metric: Union[str, callable] = "ip",
+        similarity_metric: Union[str, callable] = "ip",
     ) -> ([[VlcImage]], [[float]]):
         """Embeddings is a NxD numpy array, where N is the number of queries and D is the descriptor size
         Queries for the top k matches.
@@ -60,7 +60,7 @@ class VlcImageTable:
         """
 
         uuid_lists, distance_lists = self.embedding_store.query(
-            embeddings, k, distance_metric
+            embeddings, k, similarity_metric
         )
         images = []
         for uuids, distances in zip(uuid_lists, distance_lists):

@@ -71,11 +71,17 @@ class Config:
             return
 
         for field in dataclasses.fields(self):
-            prev = getattr(self, field.name)
-            if isinstance(prev, Config) or field.metadata.get("virtual_config", False):
-                prev.update(config.get(field.name, {}))
-            else:
-                setattr(self, field.name, config.get(field.name, prev))
+            try:
+                prev = getattr(self, field.name)
+                if isinstance(prev, Config) or field.metadata.get(
+                    "virtual_config", False
+                ):
+                    prev.update(config.get(field.name, {}))
+                else:
+                    setattr(self, field.name, config.get(field.name, prev))
+            except KeyError as e:
+                print(f"Error when updating config key {field.name}")
+                raise e
 
     def show(self):
         """Show config in human readable format."""
@@ -121,7 +127,12 @@ class ConfigFactory:
         if name not in category_factories:
             pass
 
-        return category_factories[name](*args, **kwargs)
+        if name in category_factories:
+            inst = category_factories[name](*args, **kwargs)
+        else:
+            inst = None
+
+        return inst
 
     @staticmethod
     def register(config_type, category, name=None, constructor=None):
@@ -193,20 +204,21 @@ class VirtualConfig:
     def update(self, config_data):
         """Update config struct."""
 
-        if config_data is None:
+        assert config_data is None or isinstance(config_data, dict), (
+            f"VirtualConfig must be updated by dict (or None), not {type(config_data)}. You probably nested your configuration wrong"
+        )
+
+        try:
+            typename = config_data.get("type")
+        except Exception:
+            # Logger.error(f"Could not get type for {self} from '{config_data}'")
             typename = None
-        else:
-            try:
-                typename = config_data.get("type")
-            except Exception:
-                # Logger.error(f"Could not get type for {self} from '{config_data}'")
-                raise Exception(f"Could not get type for {self} from '{config_data}'")
 
         type_changed = typename is not None and self._type != typename
         if not self._config or type_changed:
             self._create(typename=typename)
 
-        if self._config is None and config_data is not None:
+        if self._config is not None or config_data is not None:
             self._config.update(config_data)
 
     def create(self, *args, **kwargs):

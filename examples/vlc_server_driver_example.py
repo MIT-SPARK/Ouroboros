@@ -51,20 +51,19 @@ loader = RosbagDataLoader(
     data_path, rgb_topic, rgb_info_topic, body_frame=body_frame, map_frame=map_frame
 )
 
-images = None  # numpy array
-poses = None  # 7d vector
-
 vlc_frame_period_s = 0.5
 
 images_to_pose = {}
 last_vlc_frame_time = None
 
-server_config = ob.VlcServerConfig.load("config/vlc_server_config.yaml")
+server_config = ob.VlcServerConfig.load("config/gt_vlc_server_config.yaml")
+# server_config = ob.VlcServerConfig.load("config/vlc_server_config.yaml")
+print("server config: ")
+print(server_config)
 
-robot_id = 0
 vlc_server = ob.VlcServer(
     server_config,
-    robot_id=robot_id,
+    robot_id=0,
 )
 
 plt.ion()

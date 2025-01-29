@@ -11,7 +11,7 @@ class GtMatchModel:
     def infer(
         self, image0: ob.VlcImage, image1: ob.VlcImage, pose_hint: ob.VlcPose = None
     ):
-        return None
+        return None, None
 
 
 @register_config("match_model", name="ground_truth", constructor=GtMatchModel)

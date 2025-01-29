@@ -1,0 +1,17 @@
+descriptor_method:
+    type: ground_truth
+display_keypoint_matches: false
+display_place_matches: true
+keypoint_method:
+  type: ground_truth
+lc_frame_lockout_s: 10
+match_method:
+  type: ground_truth
+place_match_threshold: -2
+place_method:
+  type: ground_truth
+  lc_distance_threshold: 4
+  lc_recent_lockout_s: 10
+pose_method:
+  type: ground_truth
+strict_keypoint_evaluation: false
