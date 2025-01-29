@@ -41,9 +41,7 @@ def add_kp_matches(img, kp_left, kp_right, color=(0, 255, 0)):
         cv2.line(img, (l_x, l_y), (r_x + offset, r_y), color, 1)
 
 
-def display_kp_match_pair(
-    vlc_left, vlc_right, kp_left, kp_right, window="kp_matches", show=True
-):
+def create_kp_match_pair(vlc_left, vlc_right, kp_left, kp_right):
     img = vlc_left.image.rgb
     if img.ndim == 2 or img.shape[2] == 1:
         left_color = cv2.cvtColor(
@@ -57,6 +55,13 @@ def display_kp_match_pair(
         right_color = vlc_right.image.rgb.astype(np.uint8)
     img = create_image_pair(left_color, right_color)
     add_kp_matches(img, kp_left.astype(int), kp_right.astype(int))
+    return img
+
+
+def display_kp_match_pair(
+    vlc_left, vlc_right, kp_left, kp_right, window="kp_matches", show=True
+):
+    img = create_kp_match_pair(vlc_left, vlc_right, kp_left, kp_right)
     cv2.imshow(window, img / 255)
     if show:
         cv2.waitKey(10)

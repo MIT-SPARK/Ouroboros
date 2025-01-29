@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rospy
 import tf2_ros
-from ouroboros_ros.utils import get_tf_as_pose
 from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
+from ouroboros_ros.utils import get_tf_as_pose
 
 
 def update_plot(line, pts, images_to_pose):
@@ -84,30 +84,21 @@ class VlcServerRos:
         self.camera_frame = rospy.get_param("~camera_frame")
         self.show_plots = rospy.get_param("~show_plots")
         self.vlc_frame_period_s = rospy.get_param("~vlc_frame_period_s")
-        lc_recent_pose_lockout_s = rospy.get_param("~lc_recent_pose_lockout_s")
-        lc_similarity_threshold = rospy.get_param("~lc_similarity_threshold")
         self.lc_send_delay_s = rospy.get_param("~lc_send_delay_s")
+        self.robot_id = rospy.get_param("~robot_id")
 
-        place_method = rospy.get_param("~place_method")
-        keypoint_method = rospy.get_param("~keypoint_method")
-        descriptor_method = rospy.get_param("~descriptor_method")
-        pose_method = rospy.get_param("~pose_method")
+        plugins = ob.discover_plugins()
+        print("Found plugins: ", plugins)
+        config_path = rospy.get_param("~config_path")
+        server_config = ob.VlcServerConfig.load(config_path)
+        self.vlc_server = ob.VlcServer(
+            server_config,
+            robot_id=0,
+        )
+
         self.loop_rate = rospy.Rate(10)
-
         self.images_to_pose = {}
         self.last_vlc_frame_time = None
-
-        self.robot_id = 0
-        self.vlc_server = ob.VlcServer(
-            place_method,
-            keypoint_method,
-            descriptor_method,
-            pose_method,
-            lc_recent_pose_lockout_s * 1e9,
-            lc_similarity_threshold,
-            robot_id=0,
-            strict_keypoint_evaluation=True,
-        )
 
         if self.show_plots:
             plt.ion()
