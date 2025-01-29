@@ -1,2 +1,4 @@
-from ouroboros_ros.vlc_server_ros_display import VlcServerRosDisplayConfig, VlcServerRosDisplay
-
+from ouroboros_ros.vlc_server_ros_display import (
+    VlcServerRosDisplay,
+    VlcServerRosDisplayConfig,
+)

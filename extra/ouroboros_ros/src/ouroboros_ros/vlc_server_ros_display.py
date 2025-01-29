@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
+import numpy as np
+import rospy
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image
 
 import ouroboros as ob
 from ouroboros.config import Config, register_config
-
-import rospy
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
-import numpy as np
 
 
 class VlcServerRosDisplay:
