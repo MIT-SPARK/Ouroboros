@@ -105,7 +105,9 @@ class VlcDb:
         def time_filter(_, vlc_image, similarity):
             return vlc_image.metadata.epoch_ns < max_time
 
-        ret = self.batch_query_embeddings_filter(np.array([embedding]), k, time_filter)
+        ret = self.batch_query_embeddings_filter(
+            np.array([embedding]), k, time_filter, similarity_metric
+        )
         matches = [t[2] for t in ret[0]]
         similarities = [t[0] for t in ret[0]]
         return matches, similarities
@@ -167,7 +169,7 @@ class VlcDb:
             raise Exception("filter function must be a list, callable, or None")
 
         matches, similarities = self.batch_query_embeddings(
-            embeddings, -1, similarity_metric="ip"
+            embeddings, -1, similarity_metric=similarity_metric
         )
 
         filtered_matches_out = []

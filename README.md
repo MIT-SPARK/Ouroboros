@@ -2,7 +2,8 @@
 
 ## Installation
 
-pip install from the top-level directory. I guess we should have both packages installed by the same setup.py eventually.
+You will need to clone `opengv` as a submodule via `git submodule update --init
+--recursive`. Then run `pip install .` from the top level of this repo
 
 See the example in `examples` to get an idea of how to use the interface so far.
 

@@ -1,0 +1,20 @@
+descriptor_method: null
+display_keypoint_matches: true
+display_place_matches: true
+keypoint_method:
+  max_keypoints: 1024
+  type: SuperPoint
+lc_frame_lockout_s: 10
+match_method:
+  feature_type: superpoint
+  type: Lightglue
+place_match_threshold: 0.55
+place_method:
+  embedding_size: 8448
+  model_source: torchhub
+  model_variant: serizba/salad
+  type: Salad
+  weight_source: dinov2_salad
+pose_method:
+  type: ground_truth
+strict_keypoint_evaluation: false

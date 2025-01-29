@@ -3,7 +3,7 @@ import pathlib
 import imageio.v3 as iio
 
 import ouroboros as ob
-from ouroboros_salad.salad_model import get_salad_model
+from ouroboros_salad.salad_model import SaladModel
 
 
 def resource_dir():
@@ -11,7 +11,8 @@ def resource_dir():
 
 
 if __name__ == "__main__":
-    model = get_salad_model()
+    model = SaladModel.load("config/salad_config.yaml")
+
     img_d = iio.imread(resource_dir() / "arch.jpg")
 
     simg = ob.SparkImage(rgb=img_d)

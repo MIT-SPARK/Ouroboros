@@ -1,0 +1,1 @@
+from ouroboros_salad.salad_model import SaladModel, SaladModelConfig

@@ -1,4 +1,9 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import ouroboros as ob
+from ouroboros.config import Config, register_config
 from ouroboros.vlc_db.vlc_pose import invert_pose, pose_from_quat_trans
 
 
@@ -11,15 +16,17 @@ def recover_pose(query_pose, match_pose):
     return old_T_new
 
 
-def get_gt_pose_model():
-    return GtPoseModel()
-
-
 class GtPoseModel:
-    def __init__(self):
+    def __init__(self, config: GtPoseModel):
         pass
 
     def infer(self, query_image: ob.VlcImage, match_image: ob.VlcImage):
         p1 = query_image.pose_hint
         p2 = match_image.pose_hint
         return recover_pose(p1, p2)
+
+
+@register_config("pose_model", name="ground_truth", constructor=GtPoseModel)
+@dataclass
+class GtPoseModelConfig(Config):
+    pass

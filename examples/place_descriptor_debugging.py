@@ -6,9 +6,9 @@ import numpy as np
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
-from ouroboros_salad.salad_model import get_salad_model
+from ouroboros_salad.salad_model import SaladModel
 
-embedding_model = get_salad_model()
+embedding_model = SaladModel.load("config/salad_config.yaml")
 
 
 def combine_images(left, right):

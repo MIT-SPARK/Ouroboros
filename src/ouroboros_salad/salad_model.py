@@ -1,17 +1,27 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 import torchvision.transforms as T
 
 import ouroboros as ob
+from ouroboros.config import Config, register_config
 
 torch.backends.cudnn.benchmark = True
 
 
 class SaladModel:
-    def __init__(self, model):
-        self.embedding_size = 8448
+    def __init__(self, config: SaladModelConfig):
+        self.embedding_size = config.embedding_size
         self.similarity_metric = "ip"
-        self.model = model
+
+        if config.model_source == "torchhub":
+            model = torch.hub.load(config.model_variant, config.weight_source)
+            self.model = model.eval().to("cuda")
+        else:
+            raise Exception(f"Unknown model source {config.model_source}")
 
         self.input_transform = get_input_transform((322, 434))
 
@@ -22,12 +32,19 @@ class SaladModel:
             out = self.model(img.unsqueeze(0).to("cuda")).cpu().numpy()
         return np.squeeze(out)
 
+    @classmethod
+    def load(cls, path):
+        config = ob.config.Config.load(SaladModelConfig, path)
+        return cls(config)
 
-def get_salad_model():
-    model = torch.hub.load("serizba/salad", "dinov2_salad")
-    model = model.eval().to("cuda")
 
-    return SaladModel(model)
+@register_config("place_model", name="Salad", constructor=SaladModel)
+@dataclass
+class SaladModelConfig(Config):
+    embedding_size: int = 8448
+    model_source: str = "torchhub"
+    model_variant: str = "serizba/salad"
+    weight_source: str = "dinov2_salad"
 
 
 def get_input_transform(image_size=None):
@@ -42,15 +59,3 @@ def get_input_transform(image_size=None):
         )
     else:
         return T.Compose([T.ToTensor(), T.Normalize(mean=MEAN, std=STD)])
-
-
-# def get_descriptors(model, dataloader, device):
-#    descriptors = []
-#    with torch.no_grad():
-#        with torch.autocast(device_type="cuda", dtype=torch.float16):
-#            for batch in tqdm(dataloader, "Calculating descritptors..."):
-#                imgs, labels = batch
-#                output = model(imgs.to(device)).cpu()
-#                descriptors.append(output)
-#
-#    return torch.cat(descriptors)

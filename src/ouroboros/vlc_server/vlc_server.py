@@ -1,92 +1,38 @@
-# TODO: move this to ouroboros, not ouroboros_ros
+from __future__ import annotations
+
+from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import ouroboros as ob
+from ouroboros.config import Config, config_field, register_config
 from ouroboros.utils.plotting_utils import display_image_pair, display_kp_match_pair
 
 
 class VlcServer:
     def __init__(
         self,
-        place_method,
-        keypoint_method,
-        descriptor_method,
-        match_method,
-        pose_method,
-        lc_frame_lockout_ns,
-        place_match_threshold,
+        config: VlcServerConfig,
         robot_id=0,
-        strict_keypoint_evaluation=False,
     ):
-        self.lc_frame_lockout_ns = lc_frame_lockout_ns
-        self.place_match_threshold = place_match_threshold
-        self.display_place_matches = True
-        self.display_keypoint_matches = True
-        self.strict_keypoint_evaluation = strict_keypoint_evaluation
+        self.lc_frame_lockout_ns = config.lc_frame_lockout_s * 1e9
+        self.place_match_threshold = config.place_match_threshold
 
-        # To be replaced with "virtual configs"
-        if place_method == "salad":
-            from ouroboros_salad.salad_model import get_salad_model
+        self.display_place_matches = config.display_place_matches
+        self.display_keypoint_matches = config.display_keypoint_matches
 
-            self.place_model = get_salad_model()
-        elif place_method == "ground_truth":
-            from ouroboros_gt.gt_place_recognition import get_gt_place_model
+        self.strict_keypoint_evaluation = config.strict_keypoint_evaluation
 
-            self.place_model = get_gt_place_model()
-            raise NotImplementedError(
-                "ground truth place descriptors not yet supported (but will be)"
-            )
-        else:
-            raise NotImplementedError(f"Place descriptor {place_method} not supported")
-
-        if keypoint_method == "ground_truth":
-            from ouroboros_gt.gt_keypoint_detection import get_gt_keypoint_model
-
-            self.keypoint_model = get_gt_keypoint_model()
-        elif keypoint_method == "superpoint":
-            from ouroboros_keypoints.superpoint_interface import get_superpoint_model
-
-            self.keypoint_model = get_superpoint_model()
-        else:
-            raise NotImplementedError(
-                f"keypoint extraction method {keypoint_method} not supported"
-            )
-
-        if descriptor_method == "ground_truth":
-            from ouroboros_gt.gt_descriptors import get_gt_descriptor_model
-
-            self.descriptor_model = get_gt_descriptor_model()
-        elif descriptor_method is None:
+        self.place_model = config.place_method.create()
+        self.keypoint_model = config.keypoint_method.create()
+        self.descriptor_model = config.descriptor_method.create()
+        if self.descriptor_model is None:
             print(
                 "Desciptor method set to None. Hopefully your keypoint detector returns descriptors too..."
             )
-        else:
-            raise NotImplementedError(
-                f"descriptor extraction method {descriptor_method} not supported"
-            )
 
-        if match_method == "ground_truth":
-            from ouroboros_gt.gt_matches import get_gt_match_model
-
-            self.match_model = get_gt_match_model()
-        elif match_method == "lightglue":
-            from ouroboros_keypoints.lightglue_interface import get_lightglue_model
-
-            self.match_model = get_lightglue_model()
-        else:
-            raise NotImplementedError(
-                f"Keypoint matching method {match_method} not supported"
-            )
-
-        if pose_method == "ground_truth":
-            from ouroboros_gt.gt_pose_recovery import get_gt_pose_model
-
-            self.pose_model = get_gt_pose_model()
-        else:
-            raise NotImplementedError(
-                f"pose extraction method {pose_method} not supported"
-            )
+        self.match_model = config.match_method.create()
+        self.pose_model = config.pose_method.create()
 
         self.vlc_db = ob.VlcDb(self.place_model.embedding_size)
         self.session_id = self.vlc_db.add_session(robot_id)
@@ -200,3 +146,22 @@ class VlcServer:
         from_time_ns = self.vlc_db.get_image(lc.from_image_uuid).metadata.epoch_ns
         to_time_ns = self.vlc_db.get_image(lc.to_image_uuid).metadata.epoch_ns
         return from_time_ns, to_time_ns
+
+
+@register_config("vlc_server", name="vlc_server", constructor=VlcServer)
+@dataclass
+class VlcServerConfig(Config):
+    place_method: Any = config_field("place_model", default="Salad")
+    keypoint_method: Any = config_field("keypoint_model", default="SuperPoint")
+    descriptor_method: Any = config_field("descriptor_model", required=False)
+    match_method: Any = config_field("match_model", default="Lightglue")
+    pose_method: Any = config_field("pose_model", default="ground_truth")
+    lc_frame_lockout_s: int = 10
+    place_match_threshold: float = 0.5
+    strict_keypoint_evaluation: bool = False
+    display_place_matches: bool = True
+    display_keypoint_matches: bool = True
+
+    @classmethod
+    def load(cls, path: str):
+        return ob.config.Config.load(VlcServerConfig, path)

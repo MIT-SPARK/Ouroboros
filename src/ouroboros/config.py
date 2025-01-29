@@ -71,11 +71,17 @@ class Config:
             return
 
         for field in dataclasses.fields(self):
-            prev = getattr(self, field.name)
-            if isinstance(prev, Config) or field.metadata.get("virtual_config", False):
-                prev.update(config.get(field.name, {}))
-            else:
-                setattr(self, field.name, config.get(field.name, prev))
+            try:
+                prev = getattr(self, field.name)
+                if isinstance(prev, Config) or field.metadata.get(
+                    "virtual_config", False
+                ):
+                    prev.update(config.get(field.name, {}))
+                else:
+                    setattr(self, field.name, config.get(field.name, prev))
+            except KeyError as e:
+                print(f"Error when updating config key {field.name}")
+                raise e
 
     def show(self):
         """Show config in human readable format."""
@@ -114,13 +120,19 @@ class ConfigFactory:
         """Instantiate a specific config."""
         instance = ConfigFactory()
         if category not in instance._factories:
-            raise ValueError(f"No configs registered under category '{category}'")
+            print(f"WARNING: No configs registered under category '{category}'")
+            return None
 
         category_factories = instance._factories[category]
         if name not in category_factories:
             pass
 
-        return category_factories[name](*args, **kwargs)
+        if name in category_factories:
+            inst = category_factories[name](*args, **kwargs)
+        else:
+            inst = None
+
+        return inst
 
     @staticmethod
     def register(config_type, category, name=None, constructor=None):
@@ -181,7 +193,8 @@ class VirtualConfig:
         if not self._config:
             self._create(validate=False)
             if not self._config:
-                return {}
+                # return {}
+                return None
 
         # TODO(nathan) this is janky
         values = self._config.dump()
@@ -190,6 +203,11 @@ class VirtualConfig:
 
     def update(self, config_data):
         """Update config struct."""
+
+        assert config_data is None or isinstance(config_data, dict), (
+            f"VirtualConfig must be updated by dict (or None), not {type(config_data)}. You probably nested your configuration wrong"
+        )
+
         try:
             typename = config_data.get("type")
         except Exception:
@@ -200,14 +218,16 @@ class VirtualConfig:
         if not self._config or type_changed:
             self._create(typename=typename)
 
-        self._config.update(config_data)
+        if self._config is not None or config_data is not None:
+            self._config.update(config_data)
 
     def create(self, *args, **kwargs):
         """Call constructor with config."""
         name = self._get_curr_typename()
         constructor = ConfigFactory.get_constructor(self.category, name)
         if not constructor:
-            raise ValueError(f"constructor not specified for {self}")
+            print(f"WARNING: constructor not specified for {self}")
+            return None
 
         if not self._config:
             self._create()
