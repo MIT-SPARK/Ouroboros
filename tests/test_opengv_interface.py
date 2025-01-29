@@ -124,25 +124,20 @@ def test_points():
 
 def test_metric_solver():
     """Test that two-view geometry is called correct."""
+    expected = _get_test_pose()  # match_T_query
+
     match_features = np.random.normal(size=(30, 2))
-    match_bearings = ogv.get_bearings(np.eye(3), match_features)
-    match_depths = np.ones(match_features.shape[0])
-    # match_depths = np.random.uniform(1.2, 2.5, size=match_features.shape[0])
-    match_depths = np.ones(match_features.shape[0])
+    match_depths = np.random.uniform(1.5, 2.5, match_features.shape[0])
+    match_points = ogv.get_points(np.eye(3), match_features, match_depths)
 
-    # expected = _get_test_pose()  # match_T_query
-    expected = np.eye(4)
-    expected[:3, 3] = np.array([0.15, -0.03, 0.11])
-    query_bearings = _transform_points(match_bearings, _inverse_pose(expected))
-    query_features = query_bearings[:, :2] / query_bearings[:, 2, np.newaxis]
+    query_points = _transform_points(match_points, _inverse_pose(expected))
+    query_features = query_points[:, :2] / query_points[:, 2, np.newaxis]
 
-    indices = np.arange(query_bearings.shape[0])
-    # new_indices, query_features = _shuffle_features(query_features)
+    indices = np.arange(query_points.shape[0])
+    new_indices, query_features = _shuffle_features(query_features)
 
     # needs to be query -> match (so need indices that were used by shuffle for match)
-    # correspondences = np.vstack((indices, new_indices)).T
-    correspondences = np.vstack((indices, indices)).T
-
+    correspondences = np.vstack((indices, new_indices)).T
     result = ogv.recover_metric_pose_opengv(
         np.eye(3),
         query_features,

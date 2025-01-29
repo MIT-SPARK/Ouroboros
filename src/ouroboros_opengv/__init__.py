@@ -148,14 +148,9 @@ def recover_metric_pose_opengv(
         print(f"bearings:\n{query_bearings}")
         print(f"matches:\n{match_points}")
 
-    result = recover_translation_2d3d(
-        query_bearings.T, match_points.T, dest_R_src, threshold=1.0e-2
-    )
+    result = recover_translation_2d3d(query_bearings.T, match_points.T, dest_R_src)
     if not result:
         return None  # TODO(nathan) handle failure with state enum
 
     print(result.inliers)
-    dest_T_src = np.eye(4)
-    dest_T_src[:3, :3] = dest_R_src
-    dest_T_src[:3, 3] = result.dest_T_src[:3, 3]
-    return dest_T_src
+    return result.dest_T_src
