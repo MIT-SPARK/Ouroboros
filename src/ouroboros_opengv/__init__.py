@@ -1,7 +1,6 @@
 from typing import Optional
 
 import numpy as np
-
 from _ouroboros_opengv import Solver2d2d, Solver2d3d, solve_2d2d, solve_2d3d, solve_3d3d
 
 # TODO(nathan) use actual type alias once we move beyond 3.8
