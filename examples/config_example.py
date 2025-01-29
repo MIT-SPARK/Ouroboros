@@ -33,5 +33,15 @@ if __name__ == "__main__":
     tl_cfg = ExampleTopLevelConfig()
     tl_cfg.save("config/example_config.yaml")
 
+    """
+    Generates the following yaml file in config/example_config.yaml:
+    a_number: 0
+    a_string: a string
+    a_virtual_subconfig:
+      color: gray
+      type: Mouse
+    another_number: 0
+    """
+
     loaded_cfg = Config.load(ExampleTopLevelConfig, "config/example_config.yaml")
     print("loaded_cfg: ", loaded_cfg)

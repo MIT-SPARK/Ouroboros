@@ -1,6 +1,0 @@
-a_number: 0
-a_string: a string
-a_virtual_subconfig:
-  color: gray
-  type: Mouse
-another_number: 0
