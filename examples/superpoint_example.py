@@ -1,8 +1,8 @@
 import pathlib
-import matplotlib.pyplot as plt
-import numpy as np
 
 import imageio.v3 as iio
+import matplotlib.pyplot as plt
+import numpy as np
 
 import ouroboros as ob
 from ouroboros_keypoints.superpoint_interface import SuperPointModel

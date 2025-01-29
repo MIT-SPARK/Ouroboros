@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from ouroboros.config import register_config, Config
-from lightglue import LightGlue
-import ouroboros as ob
-import torch
+
 import numpy as np
+import torch
+from lightglue import LightGlue
+
+import ouroboros as ob
+from ouroboros.config import Config, register_config
 
 
 class LightglueModel:

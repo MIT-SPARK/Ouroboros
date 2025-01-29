@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Any
+
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import ouroboros as ob
+from ouroboros.config import Config, config_field, register_config
 from ouroboros.utils.plotting_utils import display_image_pair, display_kp_match_pair
-from ouroboros.config import Config, register_config, config_field
 
 
 class VlcServer:

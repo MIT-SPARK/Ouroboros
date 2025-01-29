@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 import ouroboros as ob
-from ouroboros.config import register_config, Config
+from ouroboros.config import Config, register_config
 
 
 class GtMatchModel:

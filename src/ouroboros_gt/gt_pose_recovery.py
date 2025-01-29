@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 import ouroboros as ob
-from ouroboros.vlc_db.vlc_pose import invert_pose, pose_from_quat_trans
 from ouroboros.config import Config, register_config
+from ouroboros.vlc_db.vlc_pose import invert_pose, pose_from_quat_trans
 
 
 def recover_pose(query_pose, match_pose):

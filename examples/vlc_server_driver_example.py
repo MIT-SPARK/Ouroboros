@@ -2,10 +2,10 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
-from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 
 def update_plot(line, pts, images_to_pose):

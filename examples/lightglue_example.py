@@ -1,14 +1,14 @@
 import pathlib
-import matplotlib.pyplot as plt
-import numpy as np
 
 import imageio.v3 as iio
+import matplotlib.pyplot as plt
+import numpy as np
+from lightglue.viz2d import plot_images, plot_matches
 
 import ouroboros as ob
-from ouroboros_keypoints.superpoint_interface import SuperPointModel
-from ouroboros_keypoints.lightglue_interface import LightglueModel
-from lightglue.viz2d import plot_images, plot_matches
 from ouroboros.utils.plotting_utils import display_kp_match_pair
+from ouroboros_keypoints.lightglue_interface import LightglueModel
+from ouroboros_keypoints.superpoint_interface import SuperPointModel
 
 
 def resource_dir():

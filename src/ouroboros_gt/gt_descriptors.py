@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from ouroboros.config import Config, register_config
+
 import numpy as np
+
 import ouroboros as ob
+from ouroboros.config import Config, register_config
 
 
 class GtDescriptorModel:

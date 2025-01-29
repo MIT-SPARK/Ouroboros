@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 import torchvision.transforms as T
-from dataclasses import dataclass
 
 import ouroboros as ob
 from ouroboros.config import Config, register_config

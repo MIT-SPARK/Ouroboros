@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 import numpy as np
+
 import ouroboros as ob
 from ouroboros.config import Config, register_config
 

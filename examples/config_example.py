@@ -1,6 +1,9 @@
+import os
+import tempfile
 from dataclasses import dataclass
-from ouroboros.config import Config, config_field, register_config
 from typing import Any
+
+from ouroboros.config import Config, config_field, register_config
 
 
 class ExampleTopLevel:
@@ -31,7 +34,11 @@ class MouseConfig(Config):
 
 if __name__ == "__main__":
     tl_cfg = ExampleTopLevelConfig()
-    tl_cfg.save("config/example_config.yaml")
+
+    d = tempfile.gettempdir()
+    fn = os.path.join(d, "example_config.yaml")
+    print(f"Saving example config in {fn}")
+    tl_cfg.save(fn)
 
     """
     Generates the following yaml file in config/example_config.yaml:
@@ -43,5 +50,5 @@ if __name__ == "__main__":
     another_number: 0
     """
 
-    loaded_cfg = Config.load(ExampleTopLevelConfig, "config/example_config.yaml")
+    loaded_cfg = Config.load(ExampleTopLevelConfig, fn)
     print("loaded_cfg: ", loaded_cfg)
