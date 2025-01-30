@@ -175,4 +175,7 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
+# sphinx specific build info
+doc/_build
+
 *.swp
