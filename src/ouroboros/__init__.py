@@ -1,6 +1,8 @@
 import importlib
 import pkgutil
 
+from ouroboros.config import *
+from ouroboros.pose_recovery import *
 from ouroboros.vlc_db import (
     KeypointSizeException,
     SparkImage,
