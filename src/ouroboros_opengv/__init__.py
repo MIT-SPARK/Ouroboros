@@ -1,9 +1,10 @@
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
-
 from _ouroboros_opengv import (
+    RansacResult,
     Solver2d2d,
     Solver2d3d,
     recover_translation_2d3d,
@@ -11,8 +12,10 @@ from _ouroboros_opengv import (
     solve_2d3d,
     solve_3d3d,
 )
+
 from ouroboros.config import Config
-from ouroboros.pose_recovery import get_bearings, get_points
+from ouroboros.pose_recovery import FeatureGeometry, PoseRecovery, PoseRecoveryResult
+from ouroboros.vlc_db.vlc_pose import invert_pose
 
 Matrix3d = np.ndarray
 
@@ -25,7 +28,7 @@ class RansacConfig(Config):
     Attributes:
         max_iterations: Maximum number of RANSAC iterations to perform
         inlier_tolerance: Inlier reprojection tolerance for model-fitting
-        inlier_probability: Probability of drawing at least one inlier during model selection
+        inlier_probability: Probability of drawing at least one inlier in model indices
         min_inliers: Minimum number of inliers
     """
 
@@ -44,6 +47,7 @@ class OpenGVPoseRecoveryConfig(Config):
         solver: 2D-2D initial solver to use [STEWENIUS, NISTER, SEVENPT, EIGHTPT]
         ransac: RANSAC parameters for 2D-2D solver
         scale_recovery: Attempt to recover translation scale if possible
+        mask_outliers: Mask rejected correspondences from 2d pose recovery
         use_pnp_for_scale: Toggles between P2P and Arun's method for scale recovery
         scale_ransac: RANSAC parameters for translation recovery
         min_cosine_similarity: Minimum similarity threshold to translation w/o scale
@@ -52,96 +56,107 @@ class OpenGVPoseRecoveryConfig(Config):
     solver: str = "STEWENIUS"
     ransac: RansacConfig = field(default_factory=RansacConfig)
     scale_recovery: bool = True
+    mask_outliers: bool = True
     use_pnp_for_scale: bool = True
     scale_ransac: RansacConfig = field(default_factory=RansacConfig)
     min_cosine_similarity: float = 0.8
 
 
-class OpenGVPoseRecovery:
+class OpenGVPoseRecovery(PoseRecovery):
     """Class for performing pose recovery."""
 
     def __init__(self, config: OpenGVPoseRecoveryConfig):
         """Initialize the opengv pose recovery class via a config."""
         self._config = config
 
-    def recover_pose(
-        self,
-        K_query: Matrix3d,
-        query_features: np.ndarray,
-        K_match: Matrix3d,
-        match_features: np.ndarray,
-        correspondences: np.ndarray,
-    ) -> Optional[np.ndarray]:
-        """
-        Recover pose up to scale from 2d correspondences.
+    @property
+    def config(self):
+        """Get underlying config."""
+        return self._config
 
-        Args:
-            K_query: Camera matrix for query features.
-            query_features: 2xN matrix of pixel features for query frame.
-            K_match: Camera matrix for match features.
-            match_features: 2xN matrix of pixel feature for match frame.
-            correspondences: Nx2 indices of feature matches (query -> match)
-            solver: Underlying 2d2d algorithm.
-
-        Returns:
-            match_T_query if underlying solver is successful.
-        """
-        query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
-        match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
-        # order is src (query), dest (match) for dest_T_src (match_T_query)
-        result = solve_2d2d(
-            query_bearings.T, match_bearings.T, solver=self._config.solver
-        )
-        if not result:
+    def _recover_translation_3d3d(
+        self, query: FeatureGeometry, match: FeatureGeometry, result_2d2d: RansacResult
+    ):
+        if not query.is_metric or match.is_metric:
+            logging.warning(
+                "Both inputs must have depth to use Arun's method for translation!"
+            )
             return None
 
-        match_T_query = result.dest_T_src
-        return match_T_query
+        match_valid = match.depths > 0.0 & np.isfinite(match.depths)
+        query_valid = query.depths > 0.0 & np.isfinite(query.depths)
+        valid = match_valid & query_valid
+        if self._config.mask_outliers:
+            inlier_mask = np.zeros_like(valid)
+            inlier_mask[result_2d2d.inliers] = True
+            valid &= inlier_mask
 
-    def recover_metric_pose(
-        self,
-        K_query: Matrix3d,
-        query_features: np.ndarray,
-        K_match: Matrix3d,
-        match_features: np.ndarray,
-        match_depths: np.ndarray,
-        correspondences: np.ndarray,
-    ) -> Optional[np.ndarray]:
-        """
-        Recover pose up to scale from 2d correspondences.
-
-        Args:
-            K_query: Camera matrix for query features.
-            query_features: Nx2 matrix of pixel features for query frame.
-            K_match: Camera matrix for match features.
-            match_features: Nx2 matrix of pixel feature for match frame.
-            match_depths: N depths for each pixel
-            correspondences: Nx2 indices of feature matches (query -> match)
-            solver: Underlying 2d2d algorithm.
-
-        Returns:
-            match_T_query if underlying solver is successful.
-        """
-        query_bearings = get_bearings(K_query, query_features[correspondences[:, 0], :])
-        match_bearings = get_bearings(K_match, match_features[correspondences[:, 1], :])
-        # order is src (query), dest (match) for dest_T_src (match_T_query)
-        result = solve_2d2d(
-            query_bearings.T, match_bearings.T, solver=self._config.solver
+        # TODO(nathan) adjust tolerance for 3d-3d solver?
+        return solve_3d3d(
+            query.points.T,
+            match.points.T,
+            max_iterations=self._config.scale_ransac.max_iterations,
+            threshold=self._config.scale_ransac.inlier_tolerance,
+            probability=self._config.scale_ransac.inlier_probability,
         )
 
-        if not result:
+    def _recover_translation_2d3d(
+        self, query: FeatureGeometry, match: FeatureGeometry, result_2d2d: RansacResult
+    ):
+        if not match.is_metric:
+            logging.warning("match is required to have depth!")
             return None
 
-        # TODO(nathan) handle masking invalid depth
+        valid = match.depths > 0.0 & np.isfinite(match.depths)
+        if self._config.mask_outliers:
+            inlier_mask = np.zeros_like(valid)
+            inlier_mask[result_2d2d.inliers] = True
+            valid &= inlier_mask
+
+        bearings = query.bearings[valid]
+        points = match.points[valid]
+        dest_R_src = result_2d2d.dest_T_src[:3, :3]
+        return recover_translation_2d3d(bearings, points, dest_R_src)
+
+    def _recover_pose(
+        self, query: FeatureGeometry, match: FeatureGeometry
+    ) -> PoseRecoveryResult:
+        """Recover pose up to scale from 2d correspondences."""
+        # order is src (query), dest (match) for dest_T_src (match_T_query)
+        result = solve_2d2d(
+            query.bearings.T,
+            match.bearings.T,
+            solver=self._config.solver,
+            max_iterations=self._config.ransac.max_iterations,
+            threshold=self._config.ransac.inlier_tolerance,
+            probability=self._config.ransac.inlier_probability,
+        )
+        if not result:
+            return PoseRecoveryResult()  # by default, invalid
+
+        nonmetric = not query.is_metric and not match.is_metric
+        if not self._config.scale_recovery or nonmetric:
+            return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
+
+        if not self._config.use_pnp_for_scale:
+            metric_result = self._recover_translation_3d3d(query, match, result)
+            if metric_result is None:
+                return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
+
+            # NOTE(nathan) we override the recovered 3d-3d translation with the
+            # more accurate 2d-2d rotation
+            metric_result.dest_T_src[:3, :3] = result.dest_T_src[:3, :3]
+            return PoseRecoveryResult.metric(metric_result.dest_T_src, result.inliers)
+
         dest_R_src = result.dest_T_src[:3, :3]
-        match_points = get_points(
-            K_match,
-            match_features[correspondences[:, 1], :],
-            match_depths[correspondences[:, 1]],
-        )
+        if not match.is_metric:
+            # we need to invert the problem to get bearing vs. point order correct
+            result = self._recover_translation_2d3d(match, query, dest_R_src.T)
+            result.dest_T_src = invert_pose(result.dest_T_src)
+        else:
+            result = self._recover_translation_2d3d(query, match, dest_R_src)
 
-        result = recover_translation_2d3d(query_bearings.T, match_points.T, dest_R_src)
-        if not result:
-            return None  # TODO(nathan) handle failure with state enum
-
-        return result.dest_T_src
+        if result is None:
+            return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
+        else:
+            return PoseRecoveryResult.metric(result.dest_T_src, result.inliers)

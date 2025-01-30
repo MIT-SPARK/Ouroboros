@@ -2,15 +2,19 @@
 
 import abc
 import logging
+from dataclasses import dataclass
+from typing import List, Optional
 
 import numpy as np
 
 from ouroboros.vlc_db.vlc_db import VlcDb
 from ouroboros.vlc_db.vlc_image import VlcImage
 
-Matrix3d = np.ndarray
 # TODO(nathan) use actual type alias once we move beyond 3.8
 # Matrix3d = np.ndarray[np.float64[3, 3]]
+# Matrix4d = np.ndarray[np.float64[4, 4]]
+Matrix3d = np.ndarray
+Matrix4d = np.ndarry
 
 
 def inverse_camera_matrix(K: Matrix3d) -> Matrix3d:
@@ -41,7 +45,7 @@ def get_bearings(K: Matrix3d, features: np.ndarray, depths: np.ndarray = None):
         depths: Optional depths for pixel features.
 
     Returns:
-        Tuple[np.ndarray, Optional[np.ndarray]]: Bearing vectors (and optionally points) in a Nx3 matrix.
+        Tuple[np.ndarray, Optional[np.ndarray]]: Bearings (and points) in Nx3 matrices.
     """
     K_inv = inverse_camera_matrix(K)
     versors = np.hstack((features, np.ones((features.shape[0], 1))))
@@ -52,7 +56,20 @@ def get_bearings(K: Matrix3d, features: np.ndarray, depths: np.ndarray = None):
     return bearings, points
 
 
-def _get_feature_depths(data: VlcImage):
+def get_feature_depths(data: VlcImage):
+    """
+    Get depth corresponding to the keypoints for image features.
+
+    Note that this has hard-to-detect artifacts from features at the boundary
+    of an image. We clip all keypoints to be inside the image with the assumption
+    that whatever is consuming the depths is robust to small misalignments.
+
+    Args:
+        data: Image to extract depth from
+
+    Returns:
+        Optiona[np.ndarray]: Depths for keypoints if possible to extract
+    """
     if data.keypoints is None:
         return None
 
@@ -70,11 +87,86 @@ def _get_feature_depths(data: VlcImage):
     return data.image.depth[coords[:, 1], coords[:0]]
 
 
+class CameraConfig:
+    fx: float
+    fy: float
+    cx: float
+    fy: float
+
+
+class Camera:
+    """Class representing a pinhole camera."""
+
+    def __init__(self, config: CameraConfig):
+        """Initialize the camera from a config."""
+        self._config = config
+
+    @property
+    def K(self):
+        """Get the (undistorted) camera matrix for the camera."""
+        mat = np.eye(3)
+        mat[0, 0] = self._config.fx
+        mat[1, 1] = self._config.fy
+        mat[0, 2] = self._config.cx
+        mat[1, 2] = self._config.cy
+        return mat
+
+
+@dataclass
+class FeatureGeometry:
+    bearings: np.ndarray
+    depths: Optional[np.ndarray] = None
+    points: Optional[np.ndarray] = None
+
+    @property
+    def is_metric(self):
+        return self.depths is not None and self.points is not None
+
+    @classmethod
+    def from_image(
+        cls, cam: Camera, img: VlcImage, indices: Optional[np.ndarray] = None
+    ):
+        """Get undistorted geometry from keypoints."""
+        depths = get_feature_depths(img)
+        keypoints = img.match.keypoints
+        if indices:
+            keypoints = keypoints[indices, :]
+            depths = depths[indices]
+
+        bearings, points = get_bearings(cam.K, keypoints, depths)
+        return cls(bearings, depths, points)
+
+
+@dataclass
+class PoseRecoveryResult:
+    """Result for pose recovery."""
+
+    query_T_match: Optional[Matrix4d] = None
+    is_metric: bool = False
+    inliers: Optional[List[int]] = None
+
+    @property
+    def valid(self):
+        """Return whether or not there is a pose estimate."""
+        return self.query_T_match is not None
+
+    @classmethod
+    def metric(cls, query_T_match: Matrix4d, inliers: Optional[List[int]] = None):
+        """Construct a metric result."""
+        return cls(query_T_match, True, inliers=inliers)
+
+    @classmethod
+    def nonmetric(cls, query_T_match: Matrix4d, inliers: Optional[List[int]] = None):
+        """Construct a non-metric result."""
+        return cls(query_T_match, False, inliers=inliers)
+
+
 class PoseRecovery(abc.ABC):
     """
     Abstract interface for a pose recovery method.
 
-    Implementations must provide...
+    Implementations must override _recover_pose which takes two sets of
+    feature geometries and returns a PoseRecoveryResult
     """
 
     def recover_pose(
@@ -89,25 +181,17 @@ class PoseRecovery(abc.ABC):
             logging.error("Keypoints required for pose recovery!")
             return None
 
-        cam_query = vlc_db.get_camera(query.metadata)
-        cam_match = vlc_db.get_match(match.metadata)
+        cam_q = vlc_db.get_camera(query.metadata)
+        cam_m = vlc_db.get_match(match.metadata)
 
         # TODO(nathan) undistortion
 
-        depths_q = _get_feature_depths(query)[query_to_match[:, 0]]
-        keypoints_q = query.keypoints[query_to_match[:, 0], :]
-        bearings_q, points_q = get_bearings(cam_query.K, keypoints_q, depths_q)
+        query_geometry = FeatureGeometry.from_image(cam_q, query, query_to_match[:0])
+        match_geometry = FeatureGeometry.from_image(cam_m, match, query_to_match[:1])
+        return self._recover_pose(query_geometry, match_geometry)
 
-        depths_m = _get_feature_depths(query)[query_to_match[:, 1]]
-        keypoints_m = match.keypoints[query_to_match[:, 1], :]
-        bearings_m, points_m = get_bearings(cam_match.K, keypoints_m, depths_m)
-
-        # TODO(nathan) bundle everything into tuples and dispatch to solver
-        # (hard to do masking based on invalid depth on the points themselves)
-
-        if points_q is None and points_m is None:
-            return self.recover_nonmetric_pose(bearings_q, bearings_m)
-        elif points_m is None:
-            raise NotImplementedError("TODO(nathan) swap query and match")
-        else:
-            return self.recover_pose(bearings_q, bearings_m)
+    @abc.abstractmethod
+    def _recover_pose(
+        self, bearings_q: np.ndarray, bearings_m: np.ndarray
+    ) -> PoseRecoveryResult:
+        pass
