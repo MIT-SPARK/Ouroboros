@@ -16,7 +16,7 @@ def pose_from_quat_trans(q, t):
     pose = np.zeros((4, 4))
     Rmat = R.from_quat(q).as_matrix()
     pose[:3, :3] = Rmat
-    pose[:3, 3] = t
+    pose[:3, 3] = np.squeeze(t)
     pose[3, 3] = 1
     return pose
 
