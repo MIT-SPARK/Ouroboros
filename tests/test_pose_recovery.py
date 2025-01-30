@@ -60,16 +60,9 @@ def test_depth_extraction():
     assert depths == pytest.approx(np.array([8, 15, 18, 5]))
 
 
-def test_camera():
-    """Test that camera matrix is correct."""
-    camera = ob.Camera(ob.CameraConfig(5.0, 10.0, 3.0, 4.0))
-    expected = np.array([[5.0, 0.0, 3.0], [0.0, 10.0, 4.0], [0.0, 0.0, 1.0]])
-    assert camera.K == pytest.approx(expected)
-
-
 def test_feature_geometry():
     """Test feature geometry creation."""
-    camera = ob.Camera(ob.CameraConfig(2.0, 2.0, 4.0, 3.0))
+    camera = ob.PinholeCamera(2.0, 2.0, 4.0, 3.0)
     img = ob.VlcImage(None, ob.SparkImage())
     img.keypoints = np.array([[4.0, 3.0], [6.0, 3.0], [4.0, 1.0]])
     geometry = ob.FeatureGeometry.from_image(camera, img)

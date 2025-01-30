@@ -390,3 +390,10 @@ def test_iterate_lcs():
     assert set((lc_uuid_1, lc_uuid_2)) == set(
         [lc.metadata.lc_uuid for lc in vlc_db.iterate_lcs()]
     )
+
+
+def test_vlc_camera():
+    """Test that camera matrix is correct."""
+    camera = ob.PinholeCamera(5.0, 10.0, 3.0, 4.0)
+    expected = np.array([[5.0, 0.0, 3.0], [0.0, 10.0, 4.0], [0.0, 0.0, 1.0]])
+    assert camera.K == pytest.approx(expected)

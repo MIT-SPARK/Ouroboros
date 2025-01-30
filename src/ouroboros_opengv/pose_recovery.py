@@ -10,6 +10,7 @@ from ouroboros.pose_recovery import FeatureGeometry, PoseRecovery, PoseRecoveryR
 from ouroboros.vlc_db.vlc_pose import invert_pose
 from ouroboros_opengv._ouroboros_opengv import (
     RansacResult,
+    Solver2d2d,
     recover_translation_2d3d,
     solve_2d2d,
     solve_3d3d,
@@ -59,6 +60,22 @@ class OpenGVPoseRecoveryConfig(Config):
     use_pnp_for_scale: bool = True
     scale_ransac: RansacConfig = field(default_factory=RansacConfig)
     min_cosine_similarity: float = 0.8
+
+    @property
+    def solver_enum(self):
+        if self.solver == "STEWENIUS":
+            return Solver2d2d.STEWENIUS
+        elif self.solver == "NISTER":
+            return Solver2d2d.NISTER
+        elif self.solver == "SEVENPT":
+            return Solver2d2d.SEVENPT
+        elif self.solver == "EIGHTPT":
+            return Solver2d2d.EIGHTPT
+        else:
+            Logger.warning(
+                "Invalid solver type '{self.solver}', defaulting to STEWENIUS!"
+            )
+            return Solver2d2d.STEWENIUS
 
 
 class OpenGVPoseRecovery(PoseRecovery):
@@ -125,7 +142,7 @@ class OpenGVPoseRecovery(PoseRecovery):
         result = solve_2d2d(
             query.bearings.T,
             match.bearings.T,
-            solver=self._config.solver,
+            solver=self._config.solver_enum,
             max_iterations=self._config.ransac.max_iterations,
             threshold=self._config.ransac.inlier_tolerance,
             probability=self._config.ransac.inlier_probability,
