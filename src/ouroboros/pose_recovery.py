@@ -83,15 +83,20 @@ def get_feature_depths(data: VlcImage):
     #     outlier-robust method, so it should be fine
     dims = data.image.depth.shape
     limit = (dims[1] - 1, dims[0] - 1)
-    coords = np.clip(np.round(data.keypoints), a_min=[0, 0], a_max=limit)
-    return data.image.depth[coords[:, 1], coords[:0]]
+    coords = np.clip(np.round(data.keypoints), a_min=[0, 0], a_max=limit).astype(
+        np.int64
+    )
+    return data.image.depth[coords[:, 1], coords[:, 0]]
 
 
+@dataclass
 class CameraConfig:
+    """Camera intrinsics configuration."""
+
     fx: float
     fy: float
     cx: float
-    fy: float
+    cy: float
 
 
 class Camera:
@@ -128,7 +133,7 @@ class FeatureGeometry:
     ):
         """Get undistorted geometry from keypoints."""
         depths = get_feature_depths(img)
-        keypoints = img.match.keypoints
+        keypoints = img.keypoints
         if indices:
             keypoints = keypoints[indices, :]
             depths = depths[indices]
@@ -145,8 +150,7 @@ class PoseRecoveryResult:
     is_metric: bool = False
     inliers: Optional[List[int]] = None
 
-    @property
-    def valid(self):
+    def __bool__(self):
         """Return whether or not there is a pose estimate."""
         return self.query_T_match is not None
 
@@ -194,4 +198,4 @@ class PoseRecovery(abc.ABC):
     def _recover_pose(
         self, bearings_q: np.ndarray, bearings_m: np.ndarray
     ) -> PoseRecoveryResult:
-        pass
+        pass  # pragma: no cover
