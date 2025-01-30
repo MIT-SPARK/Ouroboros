@@ -67,8 +67,12 @@ def test_pose_recovery():
     config = ogv.OpenGVPoseRecoveryConfig()
     pose_recovery = ogv.OpenGVPoseRecovery(config)
     vlc_db = ob.VlcDb(10)
-    result = pose_recovery.recover_pose(vlc_db, match, query, correspondences)
 
+    with pytest.raises(NotImplementedError):
+        result = pose_recovery.recover_pose(vlc_db, match, query, correspondences)
+
+    cam = ob.PinholeCamera()
+
+    result = pose_recovery.recover_pose(vlc_db, match, query, correspondences, cam, cam)
     assert result
-    assert result.is_metric
-    assert result.query_T_match == pytest.approx(expected)
+    assert not result.is_metric

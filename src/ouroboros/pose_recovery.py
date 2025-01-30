@@ -7,6 +7,7 @@ from typing import List, Optional
 
 import numpy as np
 
+from ouroboros.vlc_db.camera import PinholeCamera
 from ouroboros.vlc_db.vlc_db import VlcDb
 from ouroboros.vlc_db.vlc_image import VlcImage
 
@@ -90,34 +91,6 @@ def get_feature_depths(data: VlcImage):
 
 
 @dataclass
-class CameraConfig:
-    """Camera intrinsics configuration."""
-
-    fx: float
-    fy: float
-    cx: float
-    cy: float
-
-
-class Camera:
-    """Class representing a pinhole camera."""
-
-    def __init__(self, config: CameraConfig):
-        """Initialize the camera from a config."""
-        self._config = config
-
-    @property
-    def K(self):
-        """Get the (undistorted) camera matrix for the camera."""
-        mat = np.eye(3)
-        mat[0, 0] = self._config.fx
-        mat[1, 1] = self._config.fy
-        mat[0, 2] = self._config.cx
-        mat[1, 2] = self._config.cy
-        return mat
-
-
-@dataclass
 class FeatureGeometry:
     bearings: np.ndarray
     depths: Optional[np.ndarray] = None
@@ -129,17 +102,22 @@ class FeatureGeometry:
 
     @classmethod
     def from_image(
-        cls, cam: Camera, img: VlcImage, indices: Optional[np.ndarray] = None
+        cls, cam: PinholeCamera, img: VlcImage, indices: Optional[np.ndarray] = None
     ):
         """Get undistorted geometry from keypoints."""
         depths = get_feature_depths(img)
         keypoints = img.keypoints
-        if indices:
+        if indices is not None:
             keypoints = keypoints[indices, :]
-            depths = depths[indices]
+            depths = None if depths is None else depths[indices]
+
+        def _copy_if_valid(x):
+            return None if x is None else x.copy()
 
         bearings, points = get_bearings(cam.K, keypoints, depths)
         return cls(bearings, depths, points)
+        # _copy_if_valid(bearings), _copy_if_valid(depths), _copy_if_valid(points)
+        # )
 
 
 @dataclass
@@ -179,19 +157,27 @@ class PoseRecovery(abc.ABC):
         query: VlcImage,
         match: VlcImage,
         query_to_match: np.ndarray,
+        query_camera: Optional[PinholeCamera] = None,
+        match_camera: Optional[PinholeCamera] = None,
     ):
         """Recover pose from two frames and correspondences."""
         if query.keypoints is None or match.keypoints is None:
             logging.error("Keypoints required for pose recovery!")
             return None
 
-        cam_q = vlc_db.get_camera(query.metadata)
-        cam_m = vlc_db.get_match(match.metadata)
+        if query_camera is None:
+            query_camera = vlc_db.get_camera(query.metadata)
+        if match_camera is None:
+            match_camera = vlc_db.get_match(match.metadata)
 
         # TODO(nathan) undistortion
 
-        query_geometry = FeatureGeometry.from_image(cam_q, query, query_to_match[:0])
-        match_geometry = FeatureGeometry.from_image(cam_m, match, query_to_match[:1])
+        query_geometry = FeatureGeometry.from_image(
+            query_camera, query, query_to_match[:, 0]
+        )
+        match_geometry = FeatureGeometry.from_image(
+            match_camera, match, query_to_match[:, 1]
+        )
         return self._recover_pose(query_geometry, match_geometry)
 
     @abc.abstractmethod

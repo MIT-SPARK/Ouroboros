@@ -3,10 +3,11 @@ from typing import Callable, List, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 
+from ouroboros.vlc_db.camera import VlcCamera
 from ouroboros.vlc_db.spark_image import SparkImage
 from ouroboros.vlc_db.spark_loop_closure import SparkLoopClosure
 from ouroboros.vlc_db.utils import epoch_ns_from_datetime
-from ouroboros.vlc_db.vlc_image import VlcImage
+from ouroboros.vlc_db.vlc_image import VlcImage, VlcImageMetadata
 from ouroboros.vlc_db.vlc_image_table import VlcImageTable
 from ouroboros.vlc_db.vlc_lc_table import LcTable
 from ouroboros.vlc_db.vlc_pose import VlcPose
@@ -241,3 +242,7 @@ class VlcDb:
     def iterate_lcs(self):
         for lc in self._lc_table.iterate_lcs():
             yield lc
+
+    def get_camera(self, metadata: VlcImageMetadata) -> Optional[VlcCamera]:
+        raise NotImplementedError("Camera intrinsic storage not implemented yet!")
+        return None

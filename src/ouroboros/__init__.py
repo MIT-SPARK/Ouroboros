@@ -5,6 +5,7 @@ from ouroboros.config import *
 from ouroboros.pose_recovery import *
 from ouroboros.vlc_db import (
     KeypointSizeException,
+    PinholeCamera,
     SparkImage,
     SparkLoopClosure,
     SparkLoopClosureMetadata,
