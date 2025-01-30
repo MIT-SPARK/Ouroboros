@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
@@ -50,10 +50,10 @@ class OpenGVPoseRecoveryConfig(Config):
     """
 
     solver: str = "STEWENIUS"
-    ransac: RansacConfig = RansacConfig()
+    ransac: RansacConfig = field(default_factory=RansacConfig)
     scale_recovery: bool = True
     use_pnp_for_scale: bool = True
-    scale_ransac: RansacConfig = RansacConfig()
+    scale_ransac: RansacConfig = field(default_factory=RansacConfig)
     min_cosine_similarity: float = 0.8
 
 
