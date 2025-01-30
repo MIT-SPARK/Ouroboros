@@ -24,4 +24,4 @@ deps = [
     "pytest-sugar",
     "pytest-cov",
 ]
-commands = [["pytest", "--cov={envsitepackagesdir}/ouroboros", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]
+commands = [["pytest", "tests", "--cov={envsitepackagesdir}/ouroboros", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]

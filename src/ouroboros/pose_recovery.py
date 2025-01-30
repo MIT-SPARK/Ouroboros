@@ -14,7 +14,7 @@ from ouroboros.vlc_db.vlc_image import VlcImage
 # Matrix3d = np.ndarray[np.float64[3, 3]]
 # Matrix4d = np.ndarray[np.float64[4, 4]]
 Matrix3d = np.ndarray
-Matrix4d = np.ndarry
+Matrix4d = np.ndarray
 
 
 def inverse_camera_matrix(K: Matrix3d) -> Matrix3d:
