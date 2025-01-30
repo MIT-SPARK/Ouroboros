@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ouroboros.config import Config
+from ouroboros.config import Config, ConfigFactory
 from ouroboros.pose_recovery import FeatureGeometry, PoseRecovery, PoseRecoveryResult
 from ouroboros.vlc_db.vlc_pose import invert_pose
 from ouroboros_opengv._ouroboros_opengv import (
@@ -89,6 +89,11 @@ class OpenGVPoseRecovery(PoseRecovery):
     def config(self):
         """Get underlying config."""
         return self._config
+
+    @classmethod
+    def load(cls, path):
+        config = Config.load(OpenGVPoseRecoveryConfig, path)
+        return cls(config)
 
     def _recover_translation_3d3d(
         self, query: FeatureGeometry, match: FeatureGeometry, result_2d2d: RansacResult
@@ -193,3 +198,11 @@ class OpenGVPoseRecovery(PoseRecovery):
             dest_T_src = invert_pose(dest_T_src)
 
         return PoseRecoveryResult.metric(dest_T_src, result.inliers)
+
+
+ConfigFactory.register(
+    OpenGVPoseRecoveryConfig,
+    "pose_model",
+    name="opengv",
+    constructor=OpenGVPoseRecovery,
+)
