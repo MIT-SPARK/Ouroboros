@@ -57,39 +57,6 @@ def get_bearings(K: Matrix3d, features: np.ndarray, depths: np.ndarray = None):
     return bearings, points
 
 
-def get_feature_depths(data: VlcImage):
-    """
-    Get depth corresponding to the keypoints for image features.
-
-    Note that this has hard-to-detect artifacts from features at the boundary
-    of an image. We clip all keypoints to be inside the image with the assumption
-    that whatever is consuming the depths is robust to small misalignments.
-
-    Args:
-        data: Image to extract depth from
-
-    Returns:
-        Optiona[np.ndarray]: Depths for keypoints if possible to extract
-    """
-    if data.keypoints is None:
-        return None
-
-    if data.image.depth is None:
-        return None
-
-    # NOTE(nathan) this is ugly, but:
-    #   - To index into the image we need to swap from (u, v) to (row, col)
-    #   - Numpy frustratingly doesn't have a buffered get, so we can't zero
-    #     out-of-bounds elements. This only gets used assuming an
-    #     outlier-robust method, so it should be fine
-    dims = data.image.depth.shape
-    limit = (dims[1] - 1, dims[0] - 1)
-    coords = np.clip(np.round(data.keypoints), a_min=[0, 0], a_max=limit).astype(
-        np.int64
-    )
-    return data.image.depth[coords[:, 1], coords[:, 0]]
-
-
 @dataclass
 class FeatureGeometry:
     bearings: np.ndarray
@@ -105,7 +72,7 @@ class FeatureGeometry:
         cls, cam: PinholeCamera, img: VlcImage, indices: Optional[np.ndarray] = None
     ):
         """Get undistorted geometry from keypoints."""
-        depths = get_feature_depths(img)
+        depths = img.get_feature_depths()
         keypoints = img.keypoints
         if indices is not None:
             keypoints = keypoints[indices, :]

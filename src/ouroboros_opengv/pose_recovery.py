@@ -53,7 +53,7 @@ class OpenGVPoseRecoveryConfig(Config):
         min_cosine_similarity: Minimum similarity threshold to translation w/o scale
     """
 
-    solver: str = "STEWENIUS"
+    solver: str = "NISTER"
     ransac: RansacConfig = field(default_factory=RansacConfig)
     scale_recovery: bool = True
     mask_outliers: bool = True
@@ -93,14 +93,14 @@ class OpenGVPoseRecovery(PoseRecovery):
     def _recover_translation_3d3d(
         self, query: FeatureGeometry, match: FeatureGeometry, result_2d2d: RansacResult
     ):
-        if not query.is_metric or match.is_metric:
+        if not query.is_metric or not match.is_metric:
             Logger.warning(
                 "Both inputs must have depth to use Arun's method for translation!"
             )
             return None
 
-        match_valid = match.depths > 0.0 & np.isfinite(match.depths)
-        query_valid = query.depths > 0.0 & np.isfinite(query.depths)
+        match_valid = (match.depths > 0.0) & np.isfinite(match.depths)
+        query_valid = (query.depths > 0.0) & np.isfinite(query.depths)
         valid = match_valid & query_valid
         if self._config.mask_outliers:
             inlier_mask = np.zeros_like(valid)
@@ -117,27 +117,34 @@ class OpenGVPoseRecovery(PoseRecovery):
         )
 
     def _recover_translation_2d3d(
-        self, query: FeatureGeometry, match: FeatureGeometry, result_2d2d: RansacResult
+        self,
+        query: FeatureGeometry,
+        match: FeatureGeometry,
+        dest_R_src: Matrix3d,
+        inliers=np.ndarray,
     ):
-        if not match.is_metric:
-            Logger.warning("Match is required to have depth!")
-            return None
-
-        valid = match.depths > 0.0 & np.isfinite(match.depths)
+        valid = (match.depths > 0.0) & np.isfinite(match.depths)
         if self._config.mask_outliers:
             inlier_mask = np.zeros_like(valid)
-            inlier_mask[result_2d2d.inliers] = True
+            inlier_mask[inliers] = True
             valid &= inlier_mask
 
         bearings = query.bearings[valid]
         points = match.points[valid]
-        dest_R_src = result_2d2d.dest_T_src[:3, :3]
-        return recover_translation_2d3d(bearings, points, dest_R_src)
+        return recover_translation_2d3d(
+            bearings.T,
+            points.T,
+            dest_R_src,
+            max_iterations=self._config.scale_ransac.max_iterations,
+            threshold=self._config.scale_ransac.inlier_tolerance,
+            probability=self._config.scale_ransac.inlier_probability,
+        )
 
     def _recover_pose(
         self, query: FeatureGeometry, match: FeatureGeometry
     ) -> PoseRecoveryResult:
         """Recover pose up to scale from 2d correspondences."""
+        print(self._config)
         # order is src (query), dest (match) for dest_T_src (match_T_query)
         result = solve_2d2d(
             query.bearings.T,
@@ -156,23 +163,33 @@ class OpenGVPoseRecovery(PoseRecovery):
 
         if not self._config.use_pnp_for_scale:
             metric_result = self._recover_translation_3d3d(query, match, result)
-            if metric_result is None:
+            if metric_result is None or not metric_result:
                 return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
 
             # NOTE(nathan) we override the recovered 3d-3d translation with the
             # more accurate 2d-2d rotation
-            metric_result.dest_T_src[:3, :3] = result.dest_T_src[:3, :3]
-            return PoseRecoveryResult.metric(metric_result.dest_T_src, result.inliers)
+            dest_T_src = metric_result.dest_T_src.copy()
+            dest_T_src[:3, :3] = result.dest_T_src[:3, :3]
+            return PoseRecoveryResult.metric(dest_T_src, result.inliers)
 
         dest_R_src = result.dest_T_src[:3, :3]
+        need_inverse = False
         if not match.is_metric:
             # we need to invert the problem to get bearing vs. point order correct
-            result = self._recover_translation_2d3d(match, query, dest_R_src.T)
-            result.dest_T_src = invert_pose(result.dest_T_src)
+            need_inverse = True
+            metric_result = self._recover_translation_2d3d(
+                match, query, dest_R_src.T, result.inliers
+            )
         else:
-            result = self._recover_translation_2d3d(query, match, dest_R_src)
+            metric_result = self._recover_translation_2d3d(
+                query, match, dest_R_src, result.inliers
+            )
 
-        if result is None:
+        if not metric_result:
             return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
-        else:
-            return PoseRecoveryResult.metric(result.dest_T_src, result.inliers)
+
+        dest_T_src = metric_result.dest_T_src
+        if need_inverse:
+            dest_T_src = invert_pose(dest_T_src)
+
+        return PoseRecoveryResult.metric(dest_T_src, result.inliers)

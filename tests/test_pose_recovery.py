@@ -44,22 +44,6 @@ def test_points():
     assert points == pytest.approx(expected)
 
 
-def test_depth_extraction():
-    """Test that depth extraction for keypoints works."""
-    img = ob.VlcImage(None, ob.SparkImage())
-    # no keypoints -> no depths
-    assert ob.get_feature_depths(img) is None
-
-    img.keypoints = np.array([[2, 1], [3.1, 1.9], [-1, 10], [10, -1]])
-    # no depth image -> no depths
-    assert ob.get_feature_depths(img) is None
-
-    img.image.depth = np.arange(24).reshape((4, 6))
-    depths = ob.get_feature_depths(img)
-    # should be indices (1, 2), (2, 3), (3, 0), (0, 5)
-    assert depths == pytest.approx(np.array([8, 15, 18, 5]))
-
-
 def test_feature_geometry():
     """Test feature geometry creation."""
     camera = ob.PinholeCamera(2.0, 2.0, 4.0, 3.0)

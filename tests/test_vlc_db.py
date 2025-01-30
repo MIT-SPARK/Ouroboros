@@ -397,3 +397,19 @@ def test_vlc_camera():
     camera = ob.PinholeCamera(5.0, 10.0, 3.0, 4.0)
     expected = np.array([[5.0, 0.0, 3.0], [0.0, 10.0, 4.0], [0.0, 0.0, 1.0]])
     assert camera.K == pytest.approx(expected)
+
+
+def test_get_feature_depths():
+    """Test that depth extraction for keypoints works."""
+    img = ob.VlcImage(None, ob.SparkImage())
+    # no keypoints -> no depths
+    assert img.get_feature_depths() is None
+
+    img.keypoints = np.array([[2, 1], [3.1, 1.9], [-1, 10], [10, -1]])
+    # no depth image -> no depths
+    assert img.get_feature_depths() is None
+
+    img.image.depth = np.arange(24).reshape((4, 6))
+    depths = img.get_feature_depths()
+    # should be indices (1, 2), (2, 3), (3, 0), (0, 5)
+    assert depths == pytest.approx(np.array([8, 15, 18, 5]))
