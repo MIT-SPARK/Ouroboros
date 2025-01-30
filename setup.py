@@ -34,7 +34,7 @@ if not opengv_exists:
 if opengv_exists:
     ext_modules.append(
         Pybind11Extension(
-            "_ouroboros_opengv",
+            "ouroboros_opengv._ouroboros_opengv",
             [
                 "src/ouroboros_opengv/_bindings.cpp",
                 "third_party/opengv/src/absolute_pose/methods.cpp",
