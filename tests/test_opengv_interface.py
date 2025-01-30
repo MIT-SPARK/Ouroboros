@@ -68,10 +68,20 @@ def test_pose_recovery():
     pose_recovery = ogv.OpenGVPoseRecovery(config)
     vlc_db = ob.VlcDb(10)
 
+    cam = ob.PinholeCamera()
+
+    empty_image = ob.VlcImage(None, None)
+    result = pose_recovery.recover_pose(
+        vlc_db, empty_image, empty_image, correspondences
+    )
+    assert result is None
+
+    # for coverage until camera lookup works
     with pytest.raises(NotImplementedError):
         result = pose_recovery.recover_pose(vlc_db, match, query, correspondences)
 
-    cam = ob.PinholeCamera()
+    with pytest.raises(NotImplementedError):
+        result = pose_recovery.recover_pose(vlc_db, match, query, correspondences, cam)
 
     result = pose_recovery.recover_pose(vlc_db, match, query, correspondences, cam, cam)
     assert result
