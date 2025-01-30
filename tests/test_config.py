@@ -29,7 +29,7 @@
 #
 """Test that configuration structs work as expected."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import ouroboros as ob
@@ -62,6 +62,14 @@ class Parent(ob.Config):
     param: float = -1.0
 
 
+@dataclass
+class NestedConfig(ob.Config):
+    """Test configuration struct."""
+
+    foo: Foo = field(default_factory=Foo)
+    other: str = "world"
+
+
 def test_dump():
     """Make sure dumping works as expected."""
     foo = Foo()
@@ -89,6 +97,10 @@ def test_update():
     foo.update({})
     assert foo == Foo()
 
+    # non-dict update does nothing
+    foo.update(5.0)
+    assert foo == Foo()
+
     foo.update({"a": 10.0})
     assert foo == Foo(a=10.0)
 
@@ -100,6 +112,26 @@ def test_update():
     assert parent == Parent(child=Foo(a=5.0, b=1, c="world"), param=-2.0)
 
 
+def test_update_recursive():
+    """Test that update recurses to non-virtual configs."""
+    nested = NestedConfig()
+    assert nested == NestedConfig()
+
+    # empty update does nothing
+    nested.update({})
+    assert nested == NestedConfig()
+
+    nested.update({"foo": {"b": 1, "c": "world"}, "other": "hello!"})
+    assert nested == NestedConfig(foo=Foo(a=5.0, b=1, c="world"), other="hello!")
+
+
+def test_dump_recursive():
+    """Test that dump recurses to non-virtual configs."""
+    nested = NestedConfig()
+    expected = {"foo": {"a": 5.0, "b": 2, "c": "hello"}, "other": "world"}
+    assert nested.dump() == expected
+
+
 def test_save_load(tmp_path):
     """Test that saving and loading works."""
     filepath = tmp_path / "config.yaml"
@@ -107,6 +139,13 @@ def test_save_load(tmp_path):
     parent.save(filepath)
     result = ob.Config.load(Parent, filepath)
     assert parent == result
+
+
+def test_show():
+    """Test that show looks sane."""
+    foo = Foo()
+    expected = "Foo:\n{'a': 5.0, 'b': 2, 'c': 'hello'}"
+    assert foo.show() == expected
 
 
 def test_factory():
