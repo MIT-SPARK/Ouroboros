@@ -31,10 +31,13 @@
 
 import copy
 import dataclasses
+import logging
 import pathlib
 import pprint
 
 import yaml
+
+Logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -53,7 +56,7 @@ class Config:
                 need_type = not isinstance(field_value, VirtualConfig)
                 values[field.name] = field_value.dump(add_type=need_type)
             elif isinstance(field_value, Config):
-                # recursion required because assdict won't dispatch dump
+                # recursion required because as_dict won't dispatch dump
                 values[field.name] = field_value.dump()
 
         return values
@@ -67,21 +70,19 @@ class Config:
     def update(self, config):
         """Load settings from a dumped config."""
         if not isinstance(config, dict):
-            # Logger.error(f"Invalid config data provided to {self}")
+            Logger.error(f"Invalid config data provided to {self}")
             return
 
         for field in dataclasses.fields(self):
-            try:
-                prev = getattr(self, field.name)
-                if isinstance(prev, Config) or field.metadata.get(
-                    "virtual_config", False
-                ):
+            prev = getattr(self, field.name)
+            if isinstance(prev, Config) or field.metadata.get("virtual_config", False):
+                try:
                     prev.update(config.get(field.name, {}))
-                else:
-                    setattr(self, field.name, config.get(field.name, prev))
-            except KeyError as e:
-                print(f"Error when updating config key {field.name}")
-                raise e
+                except KeyError as e:
+                    Logger.error(f"Could not update nested config '{field.name}'!")
+                    raise e
+            else:
+                setattr(self, field.name, config.get(field.name, prev))
 
     def show(self):
         """Show config in human readable format."""
@@ -120,19 +121,15 @@ class ConfigFactory:
         """Instantiate a specific config."""
         instance = ConfigFactory()
         if category not in instance._factories:
-            print(f"WARNING: No configs registered under category '{category}'")
+            Logger.warning(f"No configs registered under category '{category}'!")
             return None
 
         category_factories = instance._factories[category]
         if name not in category_factories:
-            pass
+            Logger.error(f"Config '{name}' not registered under category '{category}'!")
+            return None
 
-        if name in category_factories:
-            inst = category_factories[name](*args, **kwargs)
-        else:
-            inst = None
-
-        return inst
+        return category_factories[name](*args, **kwargs)
 
     @staticmethod
     def register(config_type, category, name=None, constructor=None):
@@ -211,7 +208,7 @@ class VirtualConfig:
         try:
             typename = config_data.get("type")
         except Exception:
-            # Logger.error(f"Could not get type for {self} from '{config_data}'")
+            Logger.error(f"Could not get type for {self} from '{config_data}'!")
             typename = None
 
         type_changed = typename is not None and self._type != typename
@@ -226,7 +223,7 @@ class VirtualConfig:
         name = self._get_curr_typename()
         constructor = ConfigFactory.get_constructor(self.category, name)
         if not constructor:
-            print(f"WARNING: constructor not specified for {self}")
+            Logger.warning(f"Constructor not specified for {self}!")
             return None
 
         if not self._config:
