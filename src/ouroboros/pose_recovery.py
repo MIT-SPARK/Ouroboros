@@ -111,13 +111,8 @@ class FeatureGeometry:
             keypoints = keypoints[indices, :]
             depths = None if depths is None else depths[indices]
 
-        def _copy_if_valid(x):
-            return None if x is None else x.copy()
-
         bearings, points = get_bearings(cam.K, keypoints, depths)
         return cls(bearings, depths, points)
-        # _copy_if_valid(bearings), _copy_if_valid(depths), _copy_if_valid(points)
-        # )
 
 
 @dataclass
@@ -168,7 +163,7 @@ class PoseRecovery(abc.ABC):
         if query_camera is None:
             query_camera = vlc_db.get_camera(query.metadata)
         if match_camera is None:
-            match_camera = vlc_db.get_match(match.metadata)
+            match_camera = vlc_db.get_camera(match.metadata)
 
         # TODO(nathan) undistortion
 
