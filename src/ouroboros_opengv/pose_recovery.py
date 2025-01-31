@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
+from typing import Optional
 
 import numpy as np
 
@@ -59,10 +60,11 @@ class OpenGVPoseRecoveryConfig(Config):
     mask_outliers: bool = True
     use_pnp_for_scale: bool = True
     scale_ransac: RansacConfig = field(default_factory=RansacConfig)
-    min_cosine_similarity: float = 0.8
+    min_cosine_similarity: Optional[float] = None
 
     @property
     def solver_enum(self):
+        """Get enum from string."""
         if self.solver == "STEWENIUS":
             return Solver2d2d.STEWENIUS
         elif self.solver == "NISTER":
@@ -92,6 +94,7 @@ class OpenGVPoseRecovery(PoseRecovery):
 
     @classmethod
     def load(cls, path):
+        """Load opengv pose recovery from file."""
         config = Config.load(OpenGVPoseRecoveryConfig, path)
         return cls(config)
 
@@ -119,6 +122,7 @@ class OpenGVPoseRecovery(PoseRecovery):
             max_iterations=self._config.scale_ransac.max_iterations,
             threshold=self._config.scale_ransac.inlier_tolerance,
             probability=self._config.scale_ransac.inlier_probability,
+            min_inliers=self._config.scale_ransac.min_inliers,
         )
 
     def _recover_translation_2d3d(
@@ -143,13 +147,21 @@ class OpenGVPoseRecovery(PoseRecovery):
             max_iterations=self._config.scale_ransac.max_iterations,
             threshold=self._config.scale_ransac.inlier_tolerance,
             probability=self._config.scale_ransac.inlier_probability,
+            min_inliers=self._config.scale_ransac.min_inliers,
         )
+
+    def _check_result(self, pose1, pose2):
+        if self._config.min_cosine_similarity is None:
+            return True
+
+        t1 = pose1[:3, 3] / np.linalg.norm(pose1[:3, 3])
+        t2 = pose2[:3, 3] / np.linalg.norm(pose2[:3, 3])
+        return t1.dot(t2) < self._config.min_cosine_similarity
 
     def _recover_pose(
         self, query: FeatureGeometry, match: FeatureGeometry
     ) -> PoseRecoveryResult:
         """Recover pose up to scale from 2d correspondences."""
-        print(self._config)
         # order is src (query), dest (match) for dest_T_src (match_T_query)
         result = solve_2d2d(
             query.bearings.T,
@@ -158,6 +170,7 @@ class OpenGVPoseRecovery(PoseRecovery):
             max_iterations=self._config.ransac.max_iterations,
             threshold=self._config.ransac.inlier_tolerance,
             probability=self._config.ransac.inlier_probability,
+            min_inliers=self._config.ransac.min_inliers,
         )
         if not result:
             return PoseRecoveryResult()  # by default, invalid
@@ -169,6 +182,9 @@ class OpenGVPoseRecovery(PoseRecovery):
         if not self._config.use_pnp_for_scale:
             metric_result = self._recover_translation_3d3d(query, match, result)
             if metric_result is None or not metric_result:
+                return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
+
+            if not self._check_result(result.dest_T_src, metric_result.dest_T_src):
                 return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
 
             # NOTE(nathan) we override the recovered 3d-3d translation with the
@@ -196,6 +212,9 @@ class OpenGVPoseRecovery(PoseRecovery):
         dest_T_src = metric_result.dest_T_src
         if need_inverse:
             dest_T_src = invert_pose(dest_T_src)
+
+        if not self._check_result(result.dest_T_src, dest_T_src):
+            return PoseRecoveryResult.nonmetric(result.dest_T_src, result.inliers)
 
         return PoseRecoveryResult.metric(dest_T_src, result.inliers)
 

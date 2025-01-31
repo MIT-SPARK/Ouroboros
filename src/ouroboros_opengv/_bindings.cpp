@@ -169,14 +169,19 @@ PYBIND11_MODULE(_ouroboros_opengv, module) {
          RelativePoseProblem::Algorithm solver,
          size_t max_iterations,
          double threshold,
-         double probability) -> RansacResult {
+         double probability,
+         size_t min_inliers) -> RansacResult {
         EigenRelativeAdaptor adaptor(src, dest);
         Ransac<RelativePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
         ransac.probability_ = probability;
         ransac.sac_model_ = std::make_shared<RelativePoseProblem>(adaptor, solver);
-        if (!ransac.computeModel()) {
+        if (src.cols() < ransac.sac_model_->getSampleSize()) {
+          return {};
+        }
+
+        if (!ransac.computeModel() || ransac.inliers_.size() < min_inliers) {
           return {};
         }
 
@@ -191,6 +196,7 @@ Args:
   max_iterations (int): Maximum RANSAC iterations.
   threshold (float): Inlier error threshold.
   probability (float): Likelihood that minimal indices contain at least one inlier.
+  min_inliers (int): Minimum number of inliers after model selection.
 
 Returns:
   _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
@@ -199,7 +205,8 @@ Returns:
       "solver"_a = RelativePoseProblem::Algorithm::STEWENIUS,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
-      "probability"_a = 0.99);
+      "probability"_a = 0.99,
+      "min_inliers"_a = 0);
 
   module.def(
       "solve_2d3d",
@@ -208,14 +215,19 @@ Returns:
          AbsolutePoseProblem::Algorithm solver,
          size_t max_iterations,
          double threshold,
-         double probability) -> RansacResult {
+         double probability,
+         size_t min_inliers) -> RansacResult {
         EigenAbsoluteAdaptor adaptor(bearings, points);
         Ransac<AbsolutePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
         ransac.probability_ = probability;
         ransac.sac_model_ = std::make_shared<AbsolutePoseProblem>(adaptor, solver);
-        if (!ransac.computeModel()) {
+        if (bearings.cols() < ransac.sac_model_->getSampleSize()) {
+          return {};
+        }
+
+        if (!ransac.computeModel() || ransac.inliers_.size() < min_inliers) {
           return {};
         }
 
@@ -230,6 +242,7 @@ Args:
   max_iterations (int): Maximum RANSAC iterations.
   threshold (float): Inlier error threshold.
   probability (float): Likelihood that minimal indices contain at least one inlier.
+  min_inliers (int): Minimum number of inliers after model selection.
 
 Returns:
   _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
@@ -238,7 +251,8 @@ Returns:
       "solver"_a = AbsolutePoseProblem::Algorithm::KNEIP,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
-      "probability"_a = 0.99);
+      "probability"_a = 0.99,
+      "min_inliers"_a = 0);
 
   module.def(
       "recover_translation_2d3d",
@@ -247,14 +261,19 @@ Returns:
          const Eigen::Matrix3d& dest_R_src,
          size_t max_iterations,
          double threshold,
-         double probability) -> RansacResult {
+         double probability,
+         size_t min_inliers) -> RansacResult {
         EigenAbsoluteAdaptor adaptor(bearings, points, dest_R_src);
         Ransac<AbsolutePoseProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
         ransac.probability_ = probability;
         ransac.sac_model_ = std::make_shared<AbsolutePoseProblem>(adaptor, AbsolutePoseProblem::Algorithm::TWOPT);
-        if (!ransac.computeModel()) {
+        if (bearings.cols() < ransac.sac_model_->getSampleSize()) {
+          return {};
+        }
+
+        if (!ransac.computeModel() || ransac.inliers_.size() < min_inliers) {
           return {};
         }
 
@@ -269,6 +288,7 @@ Args:
   max_iterations (int): Maximum RANSAC iterations.
   threshold (float): Inlier error threshold.
   probability (float): Likelihood that minimal indices contain at least one inlier.
+  min_inliers (int): Minimum number of inliers after model selection.
 
 Returns:
   _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
@@ -277,19 +297,28 @@ Returns:
       "dest_R_src"_a,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
-      "probability"_a = 0.99);
+      "probability"_a = 0.99,
+      "min_inliers"_a = 0);
 
   module.def(
       "solve_3d3d",
-      [](const PyVec3Matrix& src, const PyVec3Matrix& dest, size_t max_iterations, double threshold, double probability)
-          -> RansacResult {
+      [](const PyVec3Matrix& src,
+         const PyVec3Matrix& dest,
+         size_t max_iterations,
+         double threshold,
+         double probability,
+         size_t min_inliers) -> RansacResult {
         EigenPointCloudAdaptor adaptor(src, dest);
         Ransac<PointCloudSacProblem> ransac;
         ransac.max_iterations_ = max_iterations;
         ransac.threshold_ = threshold;
         ransac.probability_ = probability;
         ransac.sac_model_ = std::make_shared<PointCloudSacProblem>(adaptor);
-        if (!ransac.computeModel()) {
+        if (src.cols() < ransac.sac_model_->getSampleSize()) {
+          return {};
+        }
+
+        if (!ransac.computeModel() || ransac.inliers_.size() < min_inliers) {
           return {};
         }
 
@@ -303,6 +332,7 @@ Args:
   max_iterations (int): Maximum RANSAC iterations.
   threshold (float): Inlier error threshold.
   probability (float): Likelihood that minimal indices contain at least one inlier.
+  min_inliers (int): Minimum number of inliers after model selection.
 
 Returns:
   _ouroboros_opengv.RansacResult: Potentially valid dest_T_src and associated inliers)",
@@ -310,5 +340,6 @@ Returns:
       "dest"_a,
       "max_iterations"_a = 1000,
       "threshold"_a = 1.0e-2,
-      "probability"_a = 0.99);
+      "probability"_a = 0.99,
+      "min_inliers"_a = 0);
 }
