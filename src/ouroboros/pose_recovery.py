@@ -59,12 +59,15 @@ def get_bearings(K: Matrix3d, features: np.ndarray, depths: np.ndarray = None):
 
 @dataclass
 class FeatureGeometry:
+    """Associated feature geometry."""
+
     bearings: np.ndarray
     depths: Optional[np.ndarray] = None
     points: Optional[np.ndarray] = None
 
     @property
     def is_metric(self):
+        """Whether or not the features have depth."""
         return self.depths is not None and self.points is not None
 
     @classmethod
@@ -86,23 +89,23 @@ class FeatureGeometry:
 class PoseRecoveryResult:
     """Result for pose recovery."""
 
-    query_T_match: Optional[Matrix4d] = None
+    match_T_query: Optional[Matrix4d] = None
     is_metric: bool = False
     inliers: Optional[List[int]] = None
 
     def __bool__(self):
         """Return whether or not there is a pose estimate."""
-        return self.query_T_match is not None
+        return self.match_T_query is not None
 
     @classmethod
-    def metric(cls, query_T_match: Matrix4d, inliers: Optional[List[int]] = None):
+    def metric(cls, match_T_query: Matrix4d, inliers: Optional[List[int]] = None):
         """Construct a metric result."""
-        return cls(query_T_match, True, inliers=inliers)
+        return cls(match_T_query, True, inliers=inliers)
 
     @classmethod
-    def nonmetric(cls, query_T_match: Matrix4d, inliers: Optional[List[int]] = None):
+    def nonmetric(cls, match_T_query: Matrix4d, inliers: Optional[List[int]] = None):
         """Construct a non-metric result."""
-        return cls(query_T_match, False, inliers=inliers)
+        return cls(match_T_query, False, inliers=inliers)
 
 
 class PoseRecovery(abc.ABC):
@@ -113,6 +116,7 @@ class PoseRecovery(abc.ABC):
     feature geometries and returns a PoseRecoveryResult
     """
 
+    # NOTE(nathan) documented with discussed API from earlier
     def recover_pose(
         self,
         vlc_db: VlcDb,
@@ -122,11 +126,21 @@ class PoseRecovery(abc.ABC):
         query_camera: Optional[PinholeCamera] = None,
         match_camera: Optional[PinholeCamera] = None,
     ):
-        """Recover pose from two frames and correspondences."""
+        """
+        Recover pose from two frames and correspondences.
+
+        Args:
+            query_camera: Camera corresponding to query image
+            query: Image and local features for query frame
+            match_camera: Camera corresponding to match image
+            match: Image and local features for match frame
+            query_to_match: Nx2 correspondences between local features
+        """
         if query.keypoints is None or match.keypoints is None:
             logging.error("Keypoints required for pose recovery!")
             return None
 
+        # TODO(aaron) push outside of class
         if query_camera is None:
             query_camera = vlc_db.get_camera(query.metadata)
         if match_camera is None:
@@ -143,7 +157,15 @@ class PoseRecovery(abc.ABC):
         return self._recover_pose(query_geometry, match_geometry)
 
     @abc.abstractmethod
-    def _recover_pose(
-        self, bearings_q: np.ndarray, bearings_m: np.ndarray
-    ) -> PoseRecoveryResult:
+    def _recover_pose(self, query: FeatureGeometry, match: FeatureGeometry):
+        """
+        Implement actual pose recovery from feature geometry.
+
+        Args:
+            query: Feature bearings and associated landmarks if available for query
+            match: Feature bearings and associated landmarks if available for match
+
+        Returns:
+            PoseRecoveryResult: match_T_query and associated information
+        """
         pass  # pragma: no cover

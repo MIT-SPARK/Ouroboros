@@ -97,7 +97,7 @@ def test_pose_recovery():
 
     indices = np.arange(query_points.shape[0])
     new_indices = np.arange(query.keypoints.shape[0])
-    # rng.shuffle(new_indices)
+    rng.shuffle(new_indices)
     query.keypoints = query.keypoints[new_indices, :].copy()
     query_depths = query_points[new_indices, 2]
 
@@ -117,7 +117,7 @@ def test_pose_recovery():
         )
         assert result
         assert result.is_metric
-        assert result.query_T_match == pytest.approx(expected, abs=1.0e-3)
+        assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
 
     # make sure that inverse solve works
     depths = [query_depths, None]
@@ -127,7 +127,7 @@ def test_pose_recovery():
         )
         assert result
         assert result.is_metric
-        assert result.query_T_match == pytest.approx(expected, abs=1.0e-3)
+        assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
 
     # check non-metric return behavior
     depths = [query_depths, np.zeros_like(query_depths)]
@@ -150,7 +150,7 @@ def test_pose_recovery():
         )
         assert result
         assert result.is_metric
-        assert result.query_T_match == pytest.approx(expected, abs=1.0e-3)
+        assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
 
     # 3d-3d solver fails without both depths
     depths = [query_depths, None]
