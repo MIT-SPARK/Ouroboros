@@ -1,12 +1,16 @@
 """Class representing a camera for a particular image."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
 
+from ouroboros.config import Config, register_config
 
+
+@register_config("camera", name="pinhole_camera")
 @dataclass
-class PinholeCamera:
+class PinholeCamera(Config):
     """Class representing a pinhole camera."""
 
     # NOTE(nathan) a unit camera seems like a sane default
@@ -30,4 +34,6 @@ class PinholeCamera:
 class VlcCamera:
     """Class containing database information about a camera."""
 
+    session_id: str
     camera: PinholeCamera
+    calibration_epoch_ns: Optional[int] = None
