@@ -2,12 +2,14 @@
 
 import cv_bridge
 import matplotlib.pyplot as plt
+import message_filters
 import numpy as np
 import rospy
 import tf2_ros
 from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
+from rospy import ROSException
 from scipy.spatial.transform import Rotation as R
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CameraInfo, Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
@@ -96,6 +98,12 @@ class VlcServerRos:
             robot_id=0,
         )
 
+        camera_config = self.get_camera_config_ros()
+        print("camera config: ", camera_config)
+        self.session_id = self.vlc_server.register_camera(
+            0, camera_config, rospy.Time.now().to_nsec()
+        )
+
         self.loop_rate = rospy.Rate(10)
         self.images_to_pose = {}
         self.last_vlc_frame_time = None
@@ -112,13 +120,32 @@ class VlcServerRos:
         # closure until several seconds after it is detected
         self.loop_closure_delayed_queue = []
 
-        # TODO: Should support a mode where we synchronize rgb and d (with
-        # topic synchronizer?) so that we can push combined rgbd frames to the
-        # vlc_server
+        self.image_sub = message_filters.Subscriber("~image_in", Image)
+        self.depth_sub = message_filters.Subscriber("~depth_in", Image)
 
-        self.image_sub = rospy.Subscriber("~image_in", Image, self.image_callback)
+        self.image_depth_sub = message_filters.ApproximateTimeSynchronizer(
+            [self.image_sub, self.depth_sub], 10, 0.1
+        )
+        self.image_depth_sub.registerCallback(self.image_depth_callback)
 
-    def image_callback(self, msg):
+    def get_camera_config_ros(self):
+        rate = rospy.Rate(10)
+        while not rospy.shutdown():
+            try:
+                info_msg = rospy.wait_for_message("~camera_info", CameraInfo, timeout=5)
+            except ROSException:
+                rospy.log_error("Timed out waiting for camera info")
+                rate.sleep()
+            break
+        K = info_msg.K
+        fx = K[0, 0]
+        fy = K[1, 1]
+        cx = K[0, 2]
+        cy = K[1, 2]
+        pinhole = ob.PinholeCamera(fx=fx, fy=fy, cx=cx, cy=cy)
+        return pinhole
+
+    def image_depth_callback(self, img_msg, depth_msg):
         if not (
             self.last_vlc_frame_time is None
             or (rospy.Time.now() - self.last_vlc_frame_time).to_sec()
@@ -129,7 +156,13 @@ class VlcServerRos:
 
         bridge = cv_bridge.CvBridge()
         try:
-            image = bridge.imgmsg_to_cv2(msg, "bgr8")
+            color_image = bridge.imgmsg_to_cv2(img_msg, "bgr8")
+        except cv_bridge.CvBridgeError as e:
+            print(e)
+            raise e
+
+        try:
+            depth_image = bridge.imgmsg_to_cv2(depth_msg, "passthrough")
         except cv_bridge.CvBridgeError as e:
             print(e)
             raise e
@@ -138,16 +171,19 @@ class VlcServerRos:
         # inform the place recognition, keypoint detection, keypoint
         # descriptor, and pose recovery methods.
         camera_pose = get_tf_as_pose(
-            self.tf_buffer, self.fixed_frame, self.camera_frame, msg.header.stamp
+            self.tf_buffer, self.fixed_frame, self.camera_frame, img_msg.header.stamp
         )
 
         if camera_pose is None:
             print("Cannot get current pose, skipping frame!")
             return
 
-        spark_image = ob.SparkImage(rgb=image)
+        spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
         image_uuid, loop_closures = self.vlc_server.add_and_query_frame(
-            spark_image, msg.header.stamp.to_nsec(), pose_hint=camera_pose
+            self.session_id,
+            spark_image,
+            img_msg.header.stamp.to_nsec(),
+            pose_hint=camera_pose,
         )
         self.images_to_pose[image_uuid] = camera_pose
 
@@ -161,8 +197,15 @@ class VlcServerRos:
             if self.show_plots:
                 plot_lc(lc, self.images_to_pose)
 
+            if not lc.is_metric:
+                rospy.log_warning("Skipping non-metric loop closure.")
+                continue
+
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
 
+            # TODO(Aaron): Need to convert pose to body frame in general
+            # (should work for uHumans datasets anywhat because the "body"
+            # frame is already the camera frame?)
             lc_edge = build_lc_message(
                 from_time_ns,
                 to_time_ns,
