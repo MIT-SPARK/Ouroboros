@@ -12,7 +12,7 @@ match_method:
   type: Lightglue
   feature_type: superpoint
 pose_method:
-  type: ground_truth
+  type: opengv
 lc_frame_lockout_s: 10
 place_match_threshold: 0.55
 strict_keypoint_evaluation: false

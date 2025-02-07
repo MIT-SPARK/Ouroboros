@@ -8,7 +8,6 @@ from typing import List, Optional
 import numpy as np
 
 from ouroboros.vlc_db.camera import PinholeCamera
-from ouroboros.vlc_db.vlc_db import VlcDb
 from ouroboros.vlc_db.vlc_image import VlcImage
 
 # TODO(nathan) use actual type alias once we move beyond 3.8
@@ -119,12 +118,11 @@ class PoseRecovery(abc.ABC):
     # NOTE(nathan) documented with discussed API from earlier
     def recover_pose(
         self,
-        vlc_db: VlcDb,
+        query_camera: PinholeCamera,
         query: VlcImage,
+        match_camera: PinholeCamera,
         match: VlcImage,
         query_to_match: np.ndarray,
-        query_camera: Optional[PinholeCamera] = None,
-        match_camera: Optional[PinholeCamera] = None,
     ):
         """
         Recover pose from two frames and correspondences.
@@ -139,12 +137,6 @@ class PoseRecovery(abc.ABC):
         if query.keypoints is None or match.keypoints is None:
             logging.error("Keypoints required for pose recovery!")
             return None
-
-        # TODO(aaron) push outside of class
-        if query_camera is None:
-            query_camera = vlc_db.get_camera(query.metadata)
-        if match_camera is None:
-            match_camera = vlc_db.get_camera(match.metadata)
 
         # TODO(nathan) undistortion
 
