@@ -23,11 +23,19 @@ class VlcServerRosDisplay:
 
         self.bridge = CvBridge()
 
+    def setup(self, log_path: str):
+        pass
+
     def display_image_pair(self, left: ob.VlcImage, right: ob.VlcImage, time_ns: int):
         if not self.config.display_place_matches:
             return
 
-        image_pair = ob.utils.plotting_utils.create_image_pair(left, right)
+        if right is None:
+            image_pair = ob.utils.plotting_utils.create_image_pair(left.image.rgb, None)
+        else:
+            image_pair = ob.utils.plotting_utils.create_image_pair(
+                left.image.rgb, right.image.rgb
+            )
         try:
             img_msg = self.bridge.cv2_to_imgmsg(image_pair.astype(np.uint8), "bgr8")
         except CvBridgeError as e:

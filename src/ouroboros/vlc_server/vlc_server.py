@@ -36,7 +36,7 @@ class VlcServer:
         self.match_model = config.match_method.create()
         self.pose_model = config.pose_method.create()
         self.display_method = config.display_method.create()
-        self.display_method.init(log_path)
+        self.display_method.setup(log_path)
 
         self.vlc_db = ob.VlcDb(self.place_model.embedding_size)
 
@@ -202,6 +202,7 @@ class VlcServerConfig(Config):
 
 class VlcServerOpenCvDisplay:
     def __init__(self, config: VlcServerOpenCvDisplay):
+        self.is_setup = False
         self.config = config
         if (
             config.save_place_matches
@@ -213,7 +214,8 @@ class VlcServerOpenCvDisplay:
             if not os.path.exists(config.save_dir):
                 os.mkdir(config.save_dir)
 
-    def init(self, log_path=None):
+    def setup(self, log_path=None):
+        self.is_setup = True
         if log_path is not None:
             self.save_dir = log_path
         else:
@@ -233,6 +235,7 @@ class VlcServerOpenCvDisplay:
     def display_image_pair(
         self, left: ob.SparkImage, right: Optional[ob.SparkImage], time_ns: int
     ):
+        assert self.is_setup, "Must call `setup` first"
         if self.config.display_place_matches:
             ob.utils.plotting_utils.display_image_pair(left, right)
 
@@ -255,6 +258,7 @@ class VlcServerOpenCvDisplay:
     def display_kp_match_pair(
         self, left: ob.VlcImage, right: ob.VlcImage, left_kp, right_kp, time_ns: int
     ):
+        assert self.is_setup, "Must call `setup` first"
         if self.config.display_keypoint_matches:
             ob.utils.plotting_utils.display_kp_match_pair(
                 left, right, left_kp, right_kp
@@ -274,6 +278,7 @@ class VlcServerOpenCvDisplay:
         inliers,
         time_ns: int,
     ):
+        assert self.is_setup, "Must call `setup` first"
         inlier_mask = np.zeros(len(query_to_match), dtype=bool)
         inlier_mask[inliers] = True
         left_inliers = left.keypoints[query_to_match[inlier_mask, 0]]
