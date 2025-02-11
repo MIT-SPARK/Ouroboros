@@ -95,7 +95,7 @@ plugins = ob.discover_plugins()
 print("Discovered Plugins: ")
 print(plugins)
 
-data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
+data_path = "/home/yunchang/Downloads/uhumans2/office_multi/uHumans2_office_s1_00h.bag"
 rgb_topic = "/tesse/left_cam/rgb/image_raw"
 rgb_info_topic = "/tesse/left_cam/camera_info"
 depth_topic = "/tesse/depth_cam/mono/image_raw"

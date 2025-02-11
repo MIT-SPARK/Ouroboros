@@ -53,24 +53,21 @@ class VlcServer:
         self.vlc_db.add_camera(session_id, calibration, calibration_time)
         return session_id
 
-    def add_and_query_frame(
+    def add_frame(
         self,
         session_id: str,
         image: ob.SparkImage,
         time_ns: int,
         pose_hint: ob.VlcPose = None,
-    ) -> Tuple[str, Optional[List[ob.SparkLoopClosure]]]:
+    ) -> str:
+        # Compute embedding
         embedding = self.place_model.infer(image, pose_hint)
 
-        image_matches, similarities = self.vlc_db.query_embeddings_max_time(
-            embedding,
-            1,
-            time_ns - self.lc_frame_lockout_ns,
-            similarity_metric=self.place_model.similarity_metric,
+        # Add image and embedding
+        image_id = self.vlc_db.add_image(
+            session_id, time_ns, image, pose_hint=pose_hint
         )
-
-        img_id = self.vlc_db.add_image(session_id, time_ns, image, pose_hint=pose_hint)
-        vlc_image = self.vlc_db.update_embedding(img_id, embedding)
+        vlc_image = self.vlc_db.update_embedding(image_id, embedding)
 
         if self.strict_keypoint_evaluation:
             # Optionally force all keypoints/descriptors to be computed when
@@ -83,95 +80,135 @@ class VlcServer:
                     vlc_image.image, image_keypoints, pose_hint
                 )
             vlc_image = self.vlc_db.update_keypoints(
-                img_id, image_keypoints, image_descriptors
+                image_id, image_keypoints, image_descriptors
             )
+        return image_id
+
+    def find_match(
+        self,
+        session_id: str,
+        image_id: str,
+        time_ns: int,
+    ) -> Optional[ob.VlcImage]:
+        vlc_image = self.vlc_db.get_image(image_id)
+        if vlc_image.embedding is None:
+            # TODO(Yun) print warning
+            return None
+
+        # Find matches and similarity
+        image_matches, similarities = self.vlc_db.query_embeddings_max_time(
+            vlc_image.embedding,
+            1,
+            time_ns - self.lc_frame_lockout_ns,
+            similarity_metric=self.place_model.similarity_metric,
+        )
 
         if len(similarities) == 0 or similarities[0] < self.place_match_threshold:
             image_match = None
         else:
             image_match = image_matches[0]
 
-        if image_match is None:
-            right = None
+        self.display_method.display_image_pair(vlc_image, image_match, time_ns)
+        return image_match
+
+    def compute_loop_closure_pose(
+        self,
+        session_id: str,
+        image_id: str,
+        image_match: ob.VlcImage,
+        time_ns: int,
+        pose_hint: Optional[ob.VlcPose] = None,
+    ) -> Optional[List[ob.SparkLoopClosure]]:
+        vlc_image = self.vlc_db.get_image(image_id)
+        if not self.strict_keypoint_evaluation:
+            # Since we just added the current image, we know that no keypoints
+            # or descriptors have been generated for it
+            image_keypoints, image_descriptors = self.keypoint_model.infer(
+                vlc_image.image, pose_hint=pose_hint
+            )
+            if image_descriptors is None:
+                image_descriptors = self.descriptor_model.infer(
+                    vlc_image.image, image_keypoints, pose_hint=pose_hint
+                )
+            vlc_image = self.vlc_db.update_keypoints(
+                image_id, image_keypoints, image_descriptors
+            )
+
+        # The matched frame may not yet have any keypoints or descriptors.
+        if image_match.keypoints is None:
+            keypoints, descriptors = self.keypoint_model.infer(
+                image_match.image, pose_hint=image_match.pose_hint
+            )
         else:
-            right = image_match
-        self.display_method.display_image_pair(vlc_image, right, time_ns)
+            keypoints = image_match.keypoints
+
+        if image_match.descriptors is None:
+            if descriptors is None:
+                descriptors = self.descriptor_model.infer(
+                    image_match.image, keypoints, pose_hint=image_match.pose_hint
+                )
+            image_match = self.vlc_db.update_keypoints(
+                image_match.metadata.image_uuid, keypoints, descriptors
+            )
+
+        # Match keypoints
+        img_kp_matched, stored_img_kp_matched, query_to_match = self.match_model.infer(
+            vlc_image, image_match
+        )
+        self.display_method.display_kp_match_pair(
+            vlc_image, image_match, img_kp_matched, stored_img_kp_matched, time_ns
+        )
+
+        # Extract pose
+        query_camera = self.vlc_db.get_camera(vlc_image.metadata)
+        match_camera = self.vlc_db.get_camera(image_match.metadata)
+        pose_estimate = self.pose_model.recover_pose(
+            query_camera.camera,
+            vlc_image,
+            match_camera.camera,
+            image_match,
+            query_to_match,
+        )
+        if not pose_estimate:
+            return None
+
+        self.display_method.display_inlier_kp_match_pair(
+            vlc_image,
+            image_match,
+            query_to_match,
+            pose_estimate.inliers,
+            time_ns,
+        )
+        lc = ob.SparkLoopClosure(
+            from_image_uuid=image_id,
+            to_image_uuid=image_match.metadata.image_uuid,
+            f_T_t=pose_estimate.match_T_query,
+            is_metric=pose_estimate.is_metric,
+            quality=1,
+        )
+        lc_uid = self.vlc_db.add_lc(lc, session_id, creation_time=datetime.now())
+        return [self.vlc_db.get_lc(lc_uid)]
+
+    def add_and_query_frame(
+        self,
+        session_id: str,
+        image: ob.SparkImage,
+        time_ns: int,
+        pose_hint: ob.VlcPose = None,
+    ) -> Tuple[str, Optional[List[ob.SparkLoopClosure]]]:
+        # Add to database and compute embedding (and optionally keypoints and descriptors)
+        img_id = self.add_frame(session_id, image, time_ns, pose_hint)
+
+        # Find match using the embeddings. TODO(Yun): change to uuid
+        image_match = self.find_match(session_id, img_id, time_ns)
 
         # TODO: support multiple possible place descriptor matches
-        if image_match is not None:
-            if not self.strict_keypoint_evaluation:
-                # Since we just added the current image, we know that no keypoints
-                # or descriptors have been generated for it
-                image_keypoints, image_descriptors = self.keypoint_model.infer(
-                    vlc_image.image, pose_hint=pose_hint
-                )
-                if image_descriptors is None:
-                    image_descriptors = self.descriptor_model.infer(
-                        vlc_image.image, image_keypoints, pose_hint=pose_hint
-                    )
-                vlc_image = self.vlc_db.update_keypoints(
-                    img_id, image_keypoints, image_descriptors
-                )
+        if image_match is None:
+            return img_id, None
 
-            # The matched frame may not yet have any keypoints or descriptors.
-            if image_match.keypoints is None:
-                keypoints, descriptors = self.keypoint_model.infer(
-                    image_match.image, pose_hint=image_match.pose_hint
-                )
-            else:
-                keypoints = image_match.keypoints
-
-            if image_match.descriptors is None:
-                if descriptors is None:
-                    descriptors = self.descriptor_model.infer(
-                        image_match.image, keypoints, pose_hint=image_match.pose_hint
-                    )
-                image_match = self.vlc_db.update_keypoints(
-                    image_match.metadata.image_uuid, keypoints, descriptors
-                )
-
-            # Match keypoints
-            img_kp_matched, stored_img_kp_matched, query_to_match = (
-                self.match_model.infer(vlc_image, image_match)
-            )
-            self.display_method.display_kp_match_pair(
-                vlc_image, image_match, img_kp_matched, stored_img_kp_matched, time_ns
-            )
-
-            # 3. extract pose
-            query_camera = self.vlc_db.get_camera(vlc_image.metadata)
-            match_camera = self.vlc_db.get_camera(image_match.metadata)
-            pose_estimate = self.pose_model.recover_pose(
-                query_camera.camera,
-                vlc_image,
-                match_camera.camera,
-                image_match,
-                query_to_match,
-            )
-            if pose_estimate:
-                self.display_method.display_inlier_kp_match_pair(
-                    vlc_image,
-                    image_match,
-                    query_to_match,
-                    pose_estimate.inliers,
-                    time_ns,
-                )
-                lc = ob.SparkLoopClosure(
-                    from_image_uuid=img_id,
-                    to_image_uuid=image_match.metadata.image_uuid,
-                    f_T_t=pose_estimate.match_T_query,
-                    is_metric=pose_estimate.is_metric,
-                    quality=1,
-                )
-                lc_uid = self.vlc_db.add_lc(
-                    lc, session_id, creation_time=datetime.now()
-                )
-                lc_list = [self.vlc_db.get_lc(lc_uid)]
-            else:
-                lc_list = None
-
-        else:
-            lc_list = None
+        lc_list = self.compute_loop_closure_pose(
+            session_id, img_id, image_match, time_ns, pose_hint
+        )
 
         return img_id, lc_list
 
