@@ -215,7 +215,7 @@ class VirtualConfig:
         if not self._config or type_changed:
             self._create(typename=typename)
 
-        if self._config is not None or config_data != {}:
+        if self._config is not None and config_data != {}:
             self._config.update(config_data)
 
     def create(self, *args, **kwargs):

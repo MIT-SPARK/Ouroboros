@@ -7,7 +7,8 @@ place_method:
 keypoint_method:
   type: SuperPoint
   max_keypoints: 1024
-descriptor_method: null
+descriptor_method:
+    type: null
 match_method:
   type: Lightglue
   feature_type: superpoint
