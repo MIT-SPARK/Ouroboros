@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import threading
+
 import cv_bridge
 import matplotlib.pyplot as plt
 import message_filters
@@ -120,6 +122,7 @@ class VlcServerRos:
 
         self.loop_rate = rospy.Rate(10)
         self.images_to_pose = {}
+        self.image_pose_lock = threading.Lock()
         self.last_vlc_frame_time = None
 
         if self.show_plots:
@@ -204,7 +207,8 @@ class VlcServerRos:
             img_msg.header.stamp.to_nsec(),
             pose_hint=hint_pose,
         )
-        self.images_to_pose[image_uuid] = hint_pose
+        with self.image_pose_lock:
+            self.images_to_pose[image_uuid] = hint_pose
 
         if loop_closures is None:
             return
@@ -214,10 +218,11 @@ class VlcServerRos:
         pg.header.stamp = rospy.Time.now()
         for lc in loop_closures:
             if self.show_plots:
-                query_pos, match_pos = get_query_and_est_match_position(
-                    lc, self.images_to_pose, body_T_cam
-                )
-                true_match_pos = self.images_to_pose[lc.to_image_uuid].position
+                with self.image_pose_lock:
+                    query_pos, match_pos = get_query_and_est_match_position(
+                        lc, self.images_to_pose, body_T_cam
+                    )
+                    true_match_pos = self.images_to_pose[lc.to_image_uuid].position
                 if not lc.is_metric:
                     plot_lc(query_pos, match_pos, "y")
                 elif np.linalg.norm(true_match_pos - match_pos) < 1:
@@ -231,9 +236,6 @@ class VlcServerRos:
 
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
 
-            # TODO(Aaron): Need to convert pose to body frame in general
-            # (should work for uHumans datasets anywhat because the "body"
-            # frame is already the camera frame?)
             lc_edge = build_lc_message(
                 from_time_ns,
                 to_time_ns,
@@ -267,7 +269,10 @@ class VlcServerRos:
 
     def step(self):
         if self.show_plots:
-            update_plot(self.position_line, self.position_points, self.images_to_pose)
+            with self.image_pose_lock:
+                update_plot(
+                    self.position_line, self.position_points, self.images_to_pose
+                )
 
         # This is a dumb hack because Hydra doesn't deal properly with
         # receiving loop closures where the agent nodes haven't been added to

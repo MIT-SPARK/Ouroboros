@@ -22,7 +22,7 @@ pose_method:
     inlier_tolerance: 1.0e-1
 
 lc_frame_lockout_s: 20
-place_match_threshold: 0.59
+place_match_threshold: 0.65
 strict_keypoint_evaluation: false
 
 display_method:
