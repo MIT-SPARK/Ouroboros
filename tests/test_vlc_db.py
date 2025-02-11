@@ -355,6 +355,7 @@ def test_add_lc():
         to_image_uuid=1,
         f_T_t=np.eye(4),
         quality=1,
+        is_metric=True,
     )
 
     lc_uuid = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts)
@@ -362,6 +363,7 @@ def test_add_lc():
     assert lc.from_image_uuid == 0
     assert lc.to_image_uuid == 1
     assert lc.f_T_t.shape == (4, 4)
+    assert lc.is_metric
     assert lc.metadata.lc_uuid == lc_uuid
     assert lc.metadata.session_uuid == session_id
 
@@ -372,10 +374,7 @@ def test_iterate_lcs():
 
     computed_ts = datetime.now()
     loop_closure = ob.SparkLoopClosure(
-        from_image_uuid=0,
-        to_image_uuid=1,
-        f_T_t=np.eye(4),
-        quality=1,
+        from_image_uuid=0, to_image_uuid=1, f_T_t=np.eye(4), quality=1, is_metric=True
     )
     lc_uuid_1 = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts)
     computed_ts_2 = datetime.now()
@@ -384,6 +383,7 @@ def test_iterate_lcs():
         to_image_uuid=4,
         f_T_t=np.eye(4),
         quality=1,
+        is_metric=False,
     )
     lc_uuid_2 = vlc_db.add_lc(loop_closure, session_id, creation_time=computed_ts_2)
 

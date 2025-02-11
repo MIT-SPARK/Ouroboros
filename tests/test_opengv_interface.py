@@ -58,27 +58,18 @@ def test_pose_recovery_interface():
 
     config = ogv.OpenGVPoseRecoveryConfig()
     pose_recovery = ogv.OpenGVPoseRecovery(config)
-    vlc_db = ob.VlcDb(10)
 
     cam = ob.PinholeCamera()
 
     empty_image = ob.VlcImage(None, None)
+
     result = pose_recovery.recover_pose(
-        vlc_db, empty_image, empty_image, correspondences
+        cam, empty_image, cam, empty_image, correspondences
     )
     assert result is None
 
-    # for coverage until camera lookup works
-    with pytest.raises(NotImplementedError):
-        result = pose_recovery.recover_pose(vlc_db, match, query, correspondences)
-
-    with pytest.raises(NotImplementedError):
-        result = pose_recovery.recover_pose(vlc_db, match, query, correspondences, cam)
-
     # for coverage to double-check non-metric solver works
-    result = pose_recovery.recover_pose(vlc_db, match, query, correspondences, cam, cam)
-    assert result
-    assert not result.is_metric
+    result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
 
 
 def test_pose_recovery():
@@ -106,15 +97,12 @@ def test_pose_recovery():
 
     config = ogv.OpenGVPoseRecoveryConfig()
     pose_recovery = ogv.OpenGVPoseRecovery(config)
-    vlc_db = ob.VlcDb(10)
 
     cam = ob.PinholeCamera()
 
     depths = [query_depths, match_depths]
     with mock.patch.object(ob.VlcImage, "get_feature_depths", side_effect=depths):
-        result = pose_recovery.recover_pose(
-            vlc_db, query, match, correspondences, cam, cam
-        )
+        result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
         assert result
         assert result.is_metric
         assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
@@ -122,9 +110,7 @@ def test_pose_recovery():
     # make sure that inverse solve works
     depths = [query_depths, None]
     with mock.patch.object(ob.VlcImage, "get_feature_depths", side_effect=depths):
-        result = pose_recovery.recover_pose(
-            vlc_db, query, match, correspondences, cam, cam
-        )
+        result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
         assert result
         assert result.is_metric
         assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
@@ -132,9 +118,7 @@ def test_pose_recovery():
     # check non-metric return behavior
     depths = [query_depths, np.zeros_like(query_depths)]
     with mock.patch.object(ob.VlcImage, "get_feature_depths", side_effect=depths):
-        result = pose_recovery.recover_pose(
-            vlc_db, query, match, correspondences, cam, cam
-        )
+        result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
         assert result
         assert not result.is_metric
 
@@ -145,9 +129,7 @@ def test_pose_recovery():
 
     depths = [query_depths, match_depths]
     with mock.patch.object(ob.VlcImage, "get_feature_depths", side_effect=depths):
-        result = pose_recovery.recover_pose(
-            vlc_db, query, match, correspondences, cam, cam
-        )
+        result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
         assert result
         assert result.is_metric
         assert result.match_T_query == pytest.approx(expected, abs=1.0e-3)
@@ -155,8 +137,6 @@ def test_pose_recovery():
     # 3d-3d solver fails without both depths
     depths = [query_depths, None]
     with mock.patch.object(ob.VlcImage, "get_feature_depths", side_effect=depths):
-        result = pose_recovery.recover_pose(
-            vlc_db, query, match, correspondences, cam, cam
-        )
+        result = pose_recovery.recover_pose(cam, query, cam, match, correspondences)
         assert result
         assert not result.is_metric
