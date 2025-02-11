@@ -99,7 +99,6 @@ data_path = "/home/aaron/lxc_datashare/uHumans2_apartment_s1_00h.bag"
 rgb_topic = "/tesse/left_cam/rgb/image_raw"
 rgb_info_topic = "/tesse/left_cam/camera_info"
 depth_topic = "/tesse/depth_cam/mono/image_raw"
-depth_info_topic = "/tesse/depth_cam/camera_info"
 body_frame = "base_link_gt"
 body_frame = "base_link_gt"
 map_frame = "world"
@@ -111,7 +110,6 @@ loader = RosbagDataLoader(
     body_frame=body_frame,
     map_frame=map_frame,
     depth_topic=depth_topic,
-    depth_info_topic=depth_info_topic,
 )
 
 vlc_frame_period_s = 0.5
