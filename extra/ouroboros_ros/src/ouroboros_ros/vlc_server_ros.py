@@ -7,7 +7,6 @@ import numpy as np
 import rospy
 import tf2_ros
 from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
-from rospy import ROSException
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import CameraInfo, Image
 
@@ -113,7 +112,7 @@ class VlcServerRos:
         )
 
         camera_config = self.get_camera_config_ros()
-        print("camera config: ", camera_config)
+        print(f"camera config: {camera_config}")
         self.session_id = self.vlc_server.register_camera(
             0, camera_config, rospy.Time.now().to_nsec()
         )
@@ -147,7 +146,7 @@ class VlcServerRos:
         while not rospy.is_shutdown():
             try:
                 info_msg = rospy.wait_for_message("~camera_info", CameraInfo, timeout=5)
-            except ROSException:
+            except rospy.ROSException:
                 rospy.logerr("Timed out waiting for camera info")
                 rate.sleep()
                 continue
