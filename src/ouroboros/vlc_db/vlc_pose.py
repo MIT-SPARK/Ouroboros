@@ -33,3 +33,6 @@ class VlcPose:
     @classmethod
     def from_descriptor(cls, d):
         return cls(time_ns=d[0], position=d[1:4], rotation=d[4:])
+
+    def as_matrix(self):
+        return pose_from_quat_trans(self.rotation, self.position)

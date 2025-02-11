@@ -7,18 +7,26 @@ place_method:
 keypoint_method:
   type: SuperPoint
   max_keypoints: 1024
-descriptor_method: null
+descriptor_method:
+    type: null
 match_method:
   type: Lightglue
   feature_type: superpoint
 pose_method:
-  type: ground_truth
+  type: opengv
+  scale_recovery: true
+  use_pnp_for_scale: false
+  ransac:
+    inlier_tolerance: 1.0e-6
+  scale_ransac:
+    inlier_tolerance: 1.0e-1
 
-lc_frame_lockout_s: 10
-place_match_threshold: 0.55
+lc_frame_lockout_s: 20
+place_match_threshold: 0.59
 strict_keypoint_evaluation: false
 
 display_method:
     type: ros
     display_place_matches: True
     display_keypoint_matches: True
+    display_inlier_keypoint_matches: True

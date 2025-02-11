@@ -16,4 +16,5 @@ class SparkLoopClosure:
     to_image_uuid: str
     f_T_t: np.ndarray  # 4x4
     quality: float
+    is_metric: bool
     metadata: SparkLoopClosureMetadata = None

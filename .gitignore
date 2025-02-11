@@ -179,3 +179,5 @@ pyrightconfig.json
 doc/_build
 
 *.swp
+
+examples/output

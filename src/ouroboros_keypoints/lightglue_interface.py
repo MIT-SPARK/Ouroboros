@@ -38,7 +38,7 @@ class LightglueModel:
             image0.keypoints[matches[:, 0]],
             image1.keypoints[matches[:, 1]],
         )
-        return m_kpts0, m_kpts1
+        return m_kpts0, m_kpts1, matches
 
     @classmethod
     def load(cls, path):

@@ -1,0 +1,41 @@
+camera_config:
+    type: pinhole_camera
+    fx: 415.69
+    fy: 415.69
+    cx: 360
+    cy: 240
+server_config:
+    place_method:
+      type: Salad
+      embedding_size: 8448
+      model_source: torchhub
+      model_variant: serizba/salad
+      weight_source: dinov2_salad
+    keypoint_method:
+      type: SuperPoint
+      max_keypoints: 1024
+    #descriptor_method: null
+    match_method:
+      type: Lightglue
+      feature_type: superpoint
+    pose_method:
+      type: opengv
+      scale_recovery: true
+      use_pnp_for_scale: false
+      ransac:
+        inlier_tolerance: 1.0e-6
+      scale_ransac:
+        inlier_tolerance: 1.0e-1
+    lc_frame_lockout_s: 10
+    place_match_threshold: 0.55
+    strict_keypoint_evaluation: false
+    display_method:
+        type: opencv
+        display_place_matches: True
+        save_place_matches: True
+        save_separate_place_matches: True
+        display_keypoint_matches: True
+        save_keypoint_matches: True
+        display_inlier_keypoint_matches: True
+        save_inlier_keypoint_matches: True
+        save_dir: output

@@ -1,6 +1,11 @@
 <launch>
+  <arg name="launch_rviz" default="true"/>
   <remap from="~image_in" to="/husky/camera/rgb/image"/>
+  <remap from="~camera_info" to="/husky/camera/rgb/camera_info"/>
+  <remap from="~depth_in" to="/husky/camera/depth/depth_image"/>
   <node pkg="ouroboros_ros" type="vlc_server_node.py" name="vlc_server_node" required="true" output="screen" >
         <rosparam command="load" file="$(find ouroboros_ros)/config/vlc_server_node.yaml" subst_value="true"/>
   </node>
+
+  <node if="$(arg launch_rviz)" pkg="rviz" type="rviz" name="rviz" required="false" args="-d $(find ouroboros_ros)/rviz/ouroboros_debug.rviz"/>
 </launch>

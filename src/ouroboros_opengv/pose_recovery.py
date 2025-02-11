@@ -34,7 +34,7 @@ class RansacConfig(Config):
     """
 
     max_iterations: int = 1000
-    inlier_tolerance: float = 1.0e-2
+    inlier_tolerance: float = 1.0e-4
     inlier_probability: float = 0.99
     min_inliers: int = 10
 
