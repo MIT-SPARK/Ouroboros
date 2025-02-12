@@ -1,0 +1,15 @@
+<package format="2">
+  <name>ouroboros_msgs</name>
+  <version>0.0.0</version>
+  <description>ROS msgs for Ouroboros VLC Server</description>
+  <maintainer email="aaronray@mit.edu">Aaron Ray</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>  
+</package>

@@ -9,6 +9,7 @@
   <!-- Dependencies which this package needs to build itself. -->
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>
+  <depend>ouroboros_msgs</depend>
   <depend>python3-matplotlib</depend>
   <depend>python3-scipy</depend>
 </package>
