@@ -8,7 +8,11 @@ from ouroboros_msgs.srv import VlcKeypointQuery, VlcKeypointQueryResponse
 from pose_graph_tools_msgs.msg import PoseGraph
 
 import ouroboros as ob
-from ouroboros_ros.conversions import vlc_image_from_msg, vlc_pose_from_msg
+from ouroboros_ros.conversions import (
+    vlc_image_from_msg,
+    vlc_image_to_msg,
+    vlc_pose_from_msg,
+)
 from ouroboros_ros.utils import build_lc_message, get_tf_as_pose
 from ouroboros_ros.vlc_server_ros import VlcServerRos
 
@@ -135,8 +139,12 @@ class VlcMultirobotServerRos(VlcServerRos):
             (rospy.Time.now().to_sec() + self.lc_send_delay_s, pg)
         )
 
-    def process_keypoints_request(request):
-        return VlcKeypointQueryResponse()
+    def process_keypoints_request(self, request):
+        vlc_img = self.vlc_server.get_image(request.image_uuid)
+        if vlc_img is None:
+            rospy.logwarn(f"Image ID {request.id} not found!")
+            return VlcKeypointQueryResponse()
+        return VlcKeypointQueryResponse(vlc_image=vlc_image_to_msg(vlc_img))
 
     def run(self):
         while not rospy.is_shutdown():

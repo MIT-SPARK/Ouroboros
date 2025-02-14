@@ -214,6 +214,12 @@ class VlcServer:
         to_time_ns = self.vlc_db.get_image(lc.to_image_uuid).metadata.epoch_ns
         return from_time_ns, to_time_ns
 
+    def get_image(self, image_uuid: str) -> Optional[ob.VlcImage]:
+        try:
+            return self.vlc_db.get_image(image_uuid)
+        except KeyError:
+            return None
+
 
 @register_config("vlc_server", name="vlc_server", constructor=VlcServer)
 @dataclass
