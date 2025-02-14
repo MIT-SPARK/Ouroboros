@@ -8,13 +8,12 @@ import message_filters
 import numpy as np
 import rospy
 import tf2_ros
-from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
-from scipy.spatial.transform import Rotation as R
+from pose_graph_tools_msgs.msg import PoseGraph
 from sensor_msgs.msg import CameraInfo, Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
-from ouroboros_ros.utils import get_tf_as_pose
+from ouroboros_ros.utils import build_robot_lc_message, get_tf_as_pose
 
 
 def update_plot(line, pts, images_to_pose):
@@ -54,38 +53,6 @@ def get_query_and_est_match_position(lc, image_to_pose, body_T_cam):
     query_position = query_pose.position
     est_match_position = world_T_match[:3, 3]
     return query_position, est_match_position
-
-
-def build_lc_message(
-    key_from_ns,
-    key_to_ns,
-    robot_id,
-    from_T_to,
-    pose_cov,
-    body_T_cam,
-):
-    bodyfrom_T_bodyto = body_T_cam @ from_T_to @ ob.invert_pose(body_T_cam)
-    relative_position = bodyfrom_T_bodyto[:3, 3]
-    relative_orientation = R.from_matrix(bodyfrom_T_bodyto[:3, :3])
-
-    lc_edge = PoseGraphEdge()
-    lc_edge.header.stamp = rospy.Time.now()
-    lc_edge.key_from = key_from_ns
-    lc_edge.key_to = key_to_ns
-    lc_edge.robot_from = 0
-    lc_edge.robot_to = 0
-    lc_edge.type = PoseGraphEdge.LOOPCLOSE
-    lc_edge.pose.position.x = relative_position[0]
-    lc_edge.pose.position.y = relative_position[1]
-    lc_edge.pose.position.z = relative_position[2]
-    q = relative_orientation.as_quat()
-    lc_edge.pose.orientation.x = q[0]
-    lc_edge.pose.orientation.y = q[1]
-    lc_edge.pose.orientation.z = q[2]
-    lc_edge.pose.orientation.w = q[3]
-
-    lc_edge.covariance = pose_cov.flatten()
-    return lc_edge
 
 
 class VlcServerRos:
@@ -145,11 +112,11 @@ class VlcServerRos:
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
 
-    def get_camera_config_ros(self):
+    def get_camera_config_ros(self, topic="~camera_info"):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             try:
-                info_msg = rospy.wait_for_message("~camera_info", CameraInfo, timeout=5)
+                info_msg = rospy.wait_for_message(topic, CameraInfo, timeout=5)
             except rospy.ROSException:
                 rospy.logerr("Timed out waiting for camera info")
                 rate.sleep()
@@ -239,7 +206,7 @@ class VlcServerRos:
 
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
 
-            lc_edge = build_lc_message(
+            lc_edge = build_robot_lc_message(
                 from_time_ns,
                 to_time_ns,
                 self.robot_id,

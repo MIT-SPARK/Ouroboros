@@ -86,7 +86,6 @@ class VlcServer:
 
     def find_match(
         self,
-        session_id: str,
         image_id: str,
         time_ns: int,
     ) -> Optional[str]:
