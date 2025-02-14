@@ -185,6 +185,9 @@ class VlcServerRos:
             print(e)
             raise e
 
+        if depth_msg.encoding == "16UC1":
+            depth_image = depth_image / 1000
+
         # An estimate of the current camera pose, which is optionally used to
         # inform the place recognition, keypoint detection, keypoint
         # descriptor, and pose recovery methods.
