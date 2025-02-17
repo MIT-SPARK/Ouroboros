@@ -39,12 +39,18 @@ def vlc_pose_to_msg(pose: VlcPose) -> PoseStamped:
 def vlc_image_to_msg(vlc: VlcImage) -> VlcImageMsg:
     bridge = CvBridge()
     vlc_msg = VlcImageMsg()
-    vlc_msg.image = spark_image_to_msg(vlc.image)
+    if vlc.image is not None:
+        vlc_msg.image = spark_image_to_msg(vlc.image)
     vlc_msg.header = vlc_msg.image.header
     vlc_msg.metadata = vlc_image_metadata_to_msg(vlc.metadata)
-    vlc_msg.embedding = vlc.embedding.tolist()
-    vlc_msg.keypoints = bridge.cv2_to_imgmsg(vlc.keypoints, encoding="passthrough")
-    vlc_msg.descriptors = bridge.cv2_to_imgmsg(vlc.descriptors, encoding="passthrough")
+    if vlc_msg.embedding is not None:
+        vlc_msg.embedding = vlc.embedding.tolist()
+    if vlc.keypoints is not None:
+        vlc_msg.keypoints = bridge.cv2_to_imgmsg(vlc.keypoints, encoding="passthrough")
+    if vlc.descriptors is not None:
+        vlc_msg.descriptors = bridge.cv2_to_imgmsg(
+            vlc.descriptors, encoding="passthrough"
+        )
     if vlc.pose_hint is not None:
         vlc_msg.has_pose_hint = True
         vlc_msg.pose_hint = vlc_pose_to_msg(vlc.pose_hint)
@@ -61,9 +67,20 @@ def vlc_image_metadata_from_msg(metadata_msg: VlcImageMetadataMsg) -> VlcImageMe
 
 def spark_image_from_msg(image_msg: SparkImageMsg) -> SparkImage:
     bridge = CvBridge()
+
+    if image_msg.rgb.encoding == "":
+        rgb = None
+    else:
+        rgb = bridge.imgmsg_to_cv2(image_msg.rgb, desired_encoding="passthrough")
+
+    if image_msg.depth.encoding == "":
+        depth = None
+    else:
+        depth = bridge.imgmsg_to_cv2(image_msg.depth, desired_encoding="passthrough")
+
     return SparkImage(
-        rgb=bridge.imgmsg_to_cv2(image_msg.rgb, desired_encoding="passthrough"),
-        depth=bridge.imgmsg_to_cv2(image_msg.depth, desired_encoding="passthrough"),
+        rgb=rgb,
+        depth=depth,
     )
 
 
@@ -82,16 +99,31 @@ def vlc_image_from_msg(vlc_msg: VlcImageMsg) -> VlcImage:
     pose_hint = None
     if vlc_msg.has_pose_hint:
         pose_hint = vlc_pose_from_msg(vlc_msg.pose_hint)
+
+    if len(vlc_msg.embedding) == 0:
+        embedding = None
+    else:
+        embedding = vlc_msg.embedding
+
+    if vlc_msg.keypoints.encoding == "":
+        keypoints = None
+    else:
+        keypoints = bridge.imgmsg_to_cv2(
+            vlc_msg.keypoints, desired_encoding="passthrough"
+        )
+
+    if vlc_msg.descriptors.encoding == "":
+        descriptors = None
+    else:
+        descriptors = bridge.imgmsg_to_cv2(
+            vlc_msg.descriptors, desired_encoding="passthrough"
+        )
     vlc_image = VlcImage(
         metadata=vlc_image_metadata_from_msg(vlc_msg.metadata),
         image=spark_image_from_msg(vlc_msg.image),
-        embedding=np.array(vlc_msg.embedding),
-        keypoints=bridge.imgmsg_to_cv2(
-            vlc_msg.keypoints, desired_encoding="passthrough"
-        ),
-        descriptors=bridge.imgmsg_to_cv2(
-            vlc_msg.descriptors, desired_encoding="passthrough"
-        ),
+        embedding=embedding,
+        keypoints=keypoints,
+        descriptors=descriptors,
         pose_hint=pose_hint,
     )
 

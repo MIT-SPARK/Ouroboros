@@ -25,7 +25,7 @@ from ouroboros_ros.vlc_server_ros import VlcServerRos
 
 @dataclass
 class RobotInfo:
-    session_id: str = ""
+    session_id: str = None
     camera_config: ob.config.Config = None
     body_T_cam: ob.VlcPose = None
 
@@ -34,7 +34,7 @@ class RobotInfo:
         camera_config = parse_camera_info(resp.camera_info)
         body_T_cam = vlc_pose_from_msg(resp.body_T_cam)
         return cls(
-            session_id=resp.session_id,
+            session_id=None,
             camera_config=camera_config,
             body_T_cam=body_T_cam,
         )
@@ -44,35 +44,33 @@ class VlcMultirobotServerRos(VlcServerRos):
     def __init__(self):
         super().__init__()
 
+        self.track_new_uuids = []
+
         # Spin up robot info server
         self.servers = rospy.get_param("~servers")
         self.clients = rospy.get_param("~clients")
 
-        self.embedding_publishers = []
-        self.keypoint_servers = []
+        # Publish embeddings
+        self.embedding_timer = rospy.Timer(
+            rospy.Duration(5), self.embedding_timer_callback
+        )
+        self.embedding_publisher = rospy.Publisher(
+            f"robot_{self.robot_id}/vlc_embedding", VlcImageMsg, queue_size=10
+        )
+        # Keypoint request server
+        self.keypoint_server = rospy.Service(
+            f"robot_{self.robot_id}/vlc_keypoints_request",
+            VlcKeypointQuery,
+            self.process_keypoints_request,
+        )
+
         self.embedding_subscribers = []
         self.keypoint_clients = {}
-        for server_id in self.servers:
-            # Publish embeddings
-            self.embedding_publishers.append(
-                rospy.Publisher(
-                    f"robot_{server_id}/embedding", VlcImageMsg, queue_size=10
-                )
-            )
-            # Keypoint request server
-            self.keypoint_servers.append(
-                rospy.Service(
-                    f"robot_{server_id}/keypoints_request",
-                    VlcKeypointQuery,
-                    self.process_keypoints_request,
-                )
-            )
-
         for client_id in self.clients:
             # Subscribe to embeddings
             self.embedding_subscribers.append(
                 rospy.Subscriber(
-                    f"/robot_{client_id}/embedding",
+                    f"/robot_{client_id}/vlc_embedding",
                     VlcImageMsg,
                     self.client_embedding_callback,
                     callback_args=client_id,
@@ -80,13 +78,15 @@ class VlcMultirobotServerRos(VlcServerRos):
             )
             # Keypoint request client
             self.keypoint_clients[client_id] = rospy.ServiceProxy(
-                f"/robot_{client_id}/keypoints_request", VlcKeypointQuery
+                f"/robot_{client_id}/vlc_keypoints_request", VlcKeypointQuery
             )
+
         self.info_server = rospy.Service(
             f"/robot_{self.robot_id}/vlc_info", VlcInfo, self.process_info_request
         )
 
         self.robot_infos = {}
+        self.uuid_map = {}
         self.get_robot_infos(self.servers + self.clients)
 
     def get_robot_infos(self, robot_ids, timeout=5.0):
@@ -101,6 +101,12 @@ class VlcMultirobotServerRos(VlcServerRos):
             info_client = rospy.ServiceProxy(service_name, VlcInfo)
             response = info_client()
             self.robot_infos[robot_id] = RobotInfo.from_service_response(response)
+            # Assign session_id
+            self.robot_infos[robot_id].session_id = self.vlc_server.register_camera(
+                robot_id,
+                self.robot_infos[robot_id].camera_config,
+                rospy.Time.now().to_nsec(),
+            )
 
     def process_info_request(self, request):
         response = VlcInfoResponse()
@@ -111,25 +117,30 @@ class VlcMultirobotServerRos(VlcServerRos):
         response.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
         return response
 
+    def embedding_timer_callback(self, event):
+        while len(self.track_new_uuids) > 0:
+            new_uuid = self.track_new_uuids.pop(0)
+            vlc_img_msg = vlc_image_to_msg(self.vlc_server.get_image(new_uuid))
+            self.embedding_publisher.publish(vlc_img_msg)
+
     def client_embedding_callback(self, vlc_img_msg, robot_id):
         # Add image
         vlc_image = vlc_image_from_msg(vlc_img_msg)
+        vlc_stamp = vlc_img_msg.header.stamp.to_nsec()
         new_uuid = self.vlc_server.add_frame(
             self.robot_infos[robot_id].session_id,
             vlc_image.image,
-            vlc_image.header.stamp.to_nsec(),
+            vlc_stamp,
             pose_hint=vlc_image.pose_hint,
         )
-        self.uuid_map[robot_id][new_uuid] = vlc_image.metadata.image_uuid
+        self.uuid_map[new_uuid] = vlc_image.metadata.image_uuid
 
         # Find match
-        matched_img = self.vlc_server.find_match(
-            new_uuid, vlc_image.header.stamp.to_nsec()
-        )
+        matched_img = self.vlc_server.find_match(new_uuid, vlc_stamp)
         if matched_img is None:
             return
 
-        # Request
+        # Request keypoints / descriptors
         response = self.keypoint_clients[robot_id](vlc_image.metadata.image_uuid)
         updated_vlc_img = vlc_image_from_msg(response.vlc_image)
         vlc_image = self.vlc_server.get_image(new_uuid)
@@ -182,22 +193,3 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.vlc_server.compute_keypoints_descriptors(request.image_uuid)
         vlc_img = self.vlc_server.get_image(request.image_uuid)
         return VlcKeypointQueryResponse(vlc_image=vlc_image_to_msg(vlc_img))
-
-    def run(self):
-        while not rospy.is_shutdown():
-            self.step()
-            self.loop_rate.sleep()
-
-    def step(self):
-        # This is a dumb hack because Hydra doesn't deal properly with
-        # receiving loop closures where the agent nodes haven't been added to
-        # the backend yet, which occurs a lot when the backend runs slightly
-        # slowly. You need to wait up to several seconds to send a loop closure
-        # before it will be accepted by Hydra.
-        while len(self.loop_closure_delayed_queue) > 0:
-            send_time, pg = self.loop_closure_delayed_queue[0]
-            if rospy.Time.now().to_sec() >= send_time:
-                self.lc_pub.publish(pg)
-                self.loop_closure_delayed_queue = self.loop_closure_delayed_queue[1:]
-            else:
-                break

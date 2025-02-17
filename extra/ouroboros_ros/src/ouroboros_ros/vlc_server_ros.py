@@ -95,6 +95,7 @@ class VlcServerRos:
         self.images_to_pose = {}
         self.image_pose_lock = threading.Lock()
         self.last_vlc_frame_time = None
+        self.track_new_uuids = None
 
         if self.show_plots:
             plt.ion()
@@ -176,6 +177,10 @@ class VlcServerRos:
             img_msg.header.stamp.to_nsec(),
             pose_hint=hint_pose,
         )
+
+        if self.track_new_uuids is not None:
+            self.track_new_uuids.append(image_uuid)
+
         with self.image_pose_lock:
             self.images_to_pose[image_uuid] = hint_pose
 

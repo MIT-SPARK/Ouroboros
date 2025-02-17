@@ -192,8 +192,8 @@ class VlcServer:
         # Add to database and compute embedding (and optionally keypoints and descriptors)
         query_img_id = self.add_frame(session_id, image, time_ns, pose_hint)
 
-        # Find match using the embeddings. TODO(Yun): change to uuid
-        image_match = self.find_match(session_id, query_img_id, time_ns)
+        # Find match using the embeddings.
+        image_match = self.find_match(query_img_id, time_ns)
 
         # TODO: support multiple possible place descriptor matches
         if image_match is None:

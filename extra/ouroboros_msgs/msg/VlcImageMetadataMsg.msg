@@ -1,4 +1,4 @@
 string image_uuid
 string session_id
-int32 epoch_ns
+uint64 epoch_ns
 

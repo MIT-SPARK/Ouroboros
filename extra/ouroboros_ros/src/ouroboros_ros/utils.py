@@ -61,17 +61,21 @@ def build_lc_message(
     return lc_edge
 
 
-def get_tf_as_pose(tf_buffer, fixed_frame, body_frame, time=None):
+def get_tf_as_pose(tf_buffer, fixed_frame, body_frame, time=None, timeout=1.0):
     if time is None:
         time = rospy.Time()
     try:
-        trans = tf_buffer.lookup_transform(fixed_frame, body_frame, time)
+        trans = tf_buffer.lookup_transform(
+            fixed_frame, body_frame, time, rospy.Duration(timeout)
+        )
     except (
         tf2_ros.LookupException,
         tf2_ros.ConnectivityException,
         tf2_ros.ExtrapolationException,
-    ):
-        rospy.logwarn(" Could not transform %s from %s ", fixed_frame, body_frame)
+    ) as e:
+        rospy.logwarn(
+            " Could not transform %s from %s: %s ", fixed_frame, body_frame, str(e)
+        )
         return
 
     current_pos = np.array(
