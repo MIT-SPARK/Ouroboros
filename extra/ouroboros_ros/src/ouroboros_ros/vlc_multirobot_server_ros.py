@@ -72,7 +72,7 @@ class VlcMultirobotServerRos(VlcServerRos):
             # Subscribe to embeddings
             self.embedding_subscribers.append(
                 rospy.Subscriber(
-                    f"robot_{client_id}/embedding",
+                    f"/robot_{client_id}/embedding",
                     VlcImageMsg,
                     self.client_embedding_callback,
                     callback_args=client_id,
@@ -80,17 +80,18 @@ class VlcMultirobotServerRos(VlcServerRos):
             )
             # Keypoint request client
             self.keypoint_clients[client_id] = rospy.ServiceProxy(
-                f"robot_{client_id}/keypoints_request", VlcKeypointQuery
+                f"/robot_{client_id}/keypoints_request", VlcKeypointQuery
             )
         self.info_server = rospy.Service(
-            f"robot_{client_id}/vlc_info", VlcInfo, self.process_info_request
+            f"/robot_{self.robot_id}/vlc_info", VlcInfo, self.process_info_request
         )
 
-        self.robot_infos.append(self.get_robot_infos(self.servers + self.clients))
+        self.robot_infos = {}
+        self.get_robot_infos(self.servers + self.clients)
 
     def get_robot_infos(self, robot_ids, timeout=5.0):
         for robot_id in robot_ids:
-            service_name = f"robot_{robot_id}/vlc_info"
+            service_name = f"/robot_{robot_id}/vlc_info"
             try:
                 rospy.wait_for_service(service_name, timeout)
             except rospy.ROSException as e:
@@ -99,13 +100,13 @@ class VlcMultirobotServerRos(VlcServerRos):
                 )
             info_client = rospy.ServiceProxy(service_name, VlcInfo)
             response = info_client()
-            self.robot_infos[robot_id].from_service_response(response)
+            self.robot_infos[robot_id] = RobotInfo.from_service_response(response)
 
     def process_info_request(self, request):
         response = VlcInfoResponse()
         response.session_id = self.session_id
         camera_info = CameraInfo()
-        camera_info.K = self.camera_config.flatten()
+        camera_info.K = self.camera_config.K.flatten()
         response.camera_info = camera_info
         response.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
         return response
@@ -164,8 +165,8 @@ class VlcMultirobotServerRos(VlcServerRos):
                 self.robot_id,
                 lc.f_T_t,
                 pose_cov_mat,
-                self.robot_infos[robot_id].body_T_cam,
-                self.body_T_cam,
+                self.robot_infos[robot_id].body_T_cam.as_matrix(),
+                self.body_T_cam.as_matrix(),
             )
 
             pg.edges.append(lc_edge)

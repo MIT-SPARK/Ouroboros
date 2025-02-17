@@ -118,7 +118,7 @@ class VlcServerRos:
 
         self.body_T_cam = get_tf_as_pose(
             self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
-        ).as_matrix()
+        )
 
     def get_camera_config_ros(self):
         rate = rospy.Rate(10)
@@ -129,9 +129,9 @@ class VlcServerRos:
                 rospy.logerr("Timed out waiting for camera info")
                 rate.sleep()
                 continue
-            break
-        pinhole = parse_camera_info(info_msg)
-        return pinhole
+            pinhole = parse_camera_info(info_msg)
+            return pinhole
+        return None
 
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
@@ -189,7 +189,7 @@ class VlcServerRos:
             if self.show_plots:
                 with self.image_pose_lock:
                     query_pos, match_pos = get_query_and_est_match_position(
-                        lc, self.images_to_pose, self.body_T_cam
+                        lc, self.images_to_pose, self.body_T_cam.as_matrix()
                     )
                     true_match_pos = self.images_to_pose[lc.to_image_uuid].position
                 if not lc.is_metric:
@@ -211,7 +211,7 @@ class VlcServerRos:
                 self.robot_id,
                 lc.f_T_t,
                 pose_cov_mat,
-                self.body_T_cam,
+                self.body_T_cam.as_matrix(),
             )
 
             pg.edges.append(lc_edge)
