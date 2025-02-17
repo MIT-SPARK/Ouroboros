@@ -21,6 +21,7 @@ add_service_files(
   DIRECTORY
     srv
   FILES
+    VlcInfo.srv
     VlcKeypointQuery.srv
 )
 

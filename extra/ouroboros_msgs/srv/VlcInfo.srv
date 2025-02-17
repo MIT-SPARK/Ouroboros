@@ -1,0 +1,4 @@
+---
+string session_id
+sensor_msgs/CameraInfo
+geometry_msgs/PoseStamped

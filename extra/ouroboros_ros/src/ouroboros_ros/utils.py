@@ -94,3 +94,12 @@ def get_tf_as_pose(tf_buffer, fixed_frame, body_frame, time=None):
     time_ns = trans.header.stamp.to_nsec()
     vlc_pose = ob.VlcPose(time_ns=time_ns, position=current_pos, rotation=current_rot)
     return vlc_pose
+
+
+def parse_camera_info(info_msg):
+    K = np.array(info_msg.K).reshape((3, 3))
+    fx = K[0, 0]
+    fy = K[1, 1]
+    cx = K[0, 2]
+    cy = K[1, 2]
+    return ob.PinholeCamera(fx=fx, fy=fy, cx=cx, cy=cy)

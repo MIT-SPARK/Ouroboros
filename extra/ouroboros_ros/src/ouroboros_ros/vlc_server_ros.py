@@ -13,7 +13,11 @@ from sensor_msgs.msg import CameraInfo, Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
-from ouroboros_ros.utils import build_robot_lc_message, get_tf_as_pose
+from ouroboros_ros.utils import (
+    build_robot_lc_message,
+    get_tf_as_pose,
+    parse_camera_info,
+)
 
 
 def update_plot(line, pts, images_to_pose):
@@ -78,13 +82,13 @@ class VlcServerRos:
         server_config = ob.VlcServerConfig.load(config_path)
         self.vlc_server = ob.VlcServer(
             server_config,
-            robot_id=0,
+            robot_id=self.robot_id,
         )
 
-        camera_config = self.get_camera_config_ros()
-        print(f"camera config: {camera_config}")
+        self.camera_config = self.get_camera_config_ros()
+        print(f"camera config: {self.camera_config}")
         self.session_id = self.vlc_server.register_camera(
-            0, camera_config, rospy.Time.now().to_nsec()
+            self.robot_id, self.camera_config, rospy.Time.now().to_nsec()
         )
 
         self.loop_rate = rospy.Rate(10)
@@ -112,22 +116,21 @@ class VlcServerRos:
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
 
-    def get_camera_config_ros(self, topic="~camera_info"):
+        self.body_T_cam = get_tf_as_pose(
+            self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
+        ).as_matrix()
+
+    def get_camera_config_ros(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             try:
-                info_msg = rospy.wait_for_message(topic, CameraInfo, timeout=5)
+                info_msg = rospy.wait_for_message("~camera_info", CameraInfo, timeout=5)
             except rospy.ROSException:
                 rospy.logerr("Timed out waiting for camera info")
                 rate.sleep()
                 continue
             break
-        K = np.array(info_msg.K).reshape((3, 3))
-        fx = K[0, 0]
-        fy = K[1, 1]
-        cx = K[0, 2]
-        cy = K[1, 2]
-        pinhole = ob.PinholeCamera(fx=fx, fy=fy, cx=cx, cy=cy)
+        pinhole = parse_camera_info(info_msg)
         return pinhole
 
     def image_depth_callback(self, img_msg, depth_msg):
@@ -166,10 +169,6 @@ class VlcServerRos:
             print("Cannot get current pose, skipping frame!")
             return
 
-        body_T_cam = get_tf_as_pose(
-            self.tf_buffer, self.body_frame, self.camera_frame, img_msg.header.stamp
-        ).as_matrix()
-
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
         image_uuid, loop_closures = self.vlc_server.add_and_query_frame(
             self.session_id,
@@ -190,7 +189,7 @@ class VlcServerRos:
             if self.show_plots:
                 with self.image_pose_lock:
                     query_pos, match_pos = get_query_and_est_match_position(
-                        lc, self.images_to_pose, body_T_cam
+                        lc, self.images_to_pose, self.body_T_cam
                     )
                     true_match_pos = self.images_to_pose[lc.to_image_uuid].position
                 if not lc.is_metric:
@@ -212,7 +211,7 @@ class VlcServerRos:
                 self.robot_id,
                 lc.f_T_t,
                 pose_cov_mat,
-                body_T_cam,
+                self.body_T_cam,
             )
 
             pg.edges.append(lc_edge)

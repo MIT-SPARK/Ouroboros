@@ -214,11 +214,15 @@ class VlcServer:
         to_time_ns = self.vlc_db.get_image(lc.to_image_uuid).metadata.epoch_ns
         return from_time_ns, to_time_ns
 
+    def has_image(self, image_uuid: str) -> bool:
+        if image_uuid in self.vlc_db.get_image_keys():
+            return True
+        return False
+
     def get_image(self, image_uuid: str) -> Optional[ob.VlcImage]:
-        try:
-            return self.vlc_db.get_image(image_uuid)
-        except KeyError:
+        if not self.has_image(image_uuid):
             return None
+        return self.vlc_db.get_image(image_uuid)
 
 
 @register_config("vlc_server", name="vlc_server", constructor=VlcServer)
