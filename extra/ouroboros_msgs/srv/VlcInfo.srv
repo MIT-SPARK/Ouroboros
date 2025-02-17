@@ -1,4 +1,4 @@
 ---
 string session_id
-sensor_msgs/CameraInfo
-geometry_msgs/PoseStamped
+sensor_msgs/CameraInfo camera_info
+geometry_msgs/PoseStamped body_T_cam
