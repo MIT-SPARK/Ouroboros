@@ -215,13 +215,9 @@ class VlcServer:
         return from_time_ns, to_time_ns
 
     def has_image(self, image_uuid: str) -> bool:
-        if image_uuid in self.vlc_db.get_image_keys():
-            return True
-        return False
+        return self.vlc_db.has_image(image_uuid)
 
     def get_image(self, image_uuid: str) -> Optional[ob.VlcImage]:
-        if not self.has_image(image_uuid):
-            return None
         return self.vlc_db.get_image(image_uuid)
 
 

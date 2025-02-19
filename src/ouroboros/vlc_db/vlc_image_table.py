@@ -20,8 +20,11 @@ class VlcImageTable:
         self.descriptors_store = {}
         self.pose_store = {}
 
+    def has_image(self, image_uuid):
+        return image_uuid in self.metadata_store
+
     def get_image(self, image_uuid):
-        if image_uuid not in self.metadata_store:
+        if not self.has_image(image_uuid):
             return None
         metadata = self.metadata_store[image_uuid]
         image = self.image_store[image_uuid]

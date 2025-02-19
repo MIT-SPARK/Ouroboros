@@ -41,6 +41,9 @@ class VlcDb:
             session_id, image_timestamp, image, pose_hint
         )
 
+    def has_image(self, image_uuid: str) -> bool:
+        return self._image_table.has_image(image_uuid)
+
     def get_image(self, image_uuid: str) -> VlcImage:
         img = self._image_table.get_image(image_uuid)
         if img is None:
