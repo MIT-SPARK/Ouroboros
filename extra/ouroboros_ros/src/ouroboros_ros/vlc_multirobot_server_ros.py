@@ -87,6 +87,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         self.robot_infos = {}
         self.uuid_map = {}
+        self.session_robot_map = {}
         self.get_robot_infos(self.servers + self.clients)
 
     def get_robot_infos(self, robot_ids, timeout=5.0):
@@ -107,6 +108,7 @@ class VlcMultirobotServerRos(VlcServerRos):
                 self.robot_infos[robot_id].camera_config,
                 rospy.Time.now().to_nsec(),
             )
+            self.session_robot_map[self.robot_infos[robot_id].session_id] = robot_id
 
     def process_info_request(self, request):
         response = VlcInfoResponse()
@@ -124,10 +126,34 @@ class VlcMultirobotServerRos(VlcServerRos):
             stamp_ns,
             pose_hint=hint_pose,
         )
-        # TODO)(Yun) fill in
         self.track_new_uuids.append(new_uuid)
 
-        return new_uuid, None
+        # Find match using the embeddings.
+        image_match = self.vlc_server.find_match(new_uuid, stamp_ns)
+
+        if image_match is None:
+            return new_uuid, None
+
+        if image_match.keypoints is None:
+            match_uuid = image_match.metadata.image_uuid
+            remapped_match_uuid = self.uuid_map[match_uuid]
+
+            # Request keypoint and descriptors for match
+            robot_id = self.session_robot_map[image_match.metadata.session_id]
+            response = self.keypoint_clients[robot_id](remapped_match_uuid)
+            vlc_response = vlc_image_from_msg(response.vlc_image)
+            self.vlc_server.update_keypoints_decriptors(
+                match_uuid, vlc_response.keypoints, vlc_response.descriptors
+            )
+
+        # Compute self keypoints and descriptors
+        self.vlc_server.compute_keypoints_descriptors(new_uuid)
+
+        lc_list = self.vlc_server.compute_loop_closure_pose(
+            self.session_id, new_uuid, image_match.metadata.image_uuid, stamp_ns
+        )
+
+        return new_uuid, lc_list
 
     def embedding_timer_callback(self, event):
         while len(self.track_new_uuids) > 0:
