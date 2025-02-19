@@ -36,7 +36,8 @@ class VlcServer:
         self.match_model = config.match_method.create()
         self.pose_model = config.pose_method.create()
         self.display_method = config.display_method.create()
-        self.display_method.setup(log_path)
+        if self.display_method:
+            self.display_method.setup(log_path)
 
         self.vlc_db = ob.VlcDb(self.place_model.embedding_size)
 
@@ -84,6 +85,18 @@ class VlcServer:
             )
         return image_id
 
+    def add_embedding_no_image(
+        self,
+        session_id: str,
+        embedding: np.ndarray,
+        time_ns: int,
+        pose_hint: ob.VlcPose = None,
+    ) -> str:
+        # Add image and embedding
+        image_id = self.vlc_db.add_image(session_id, time_ns, None, pose_hint=pose_hint)
+        self.vlc_db.update_embedding(image_id, embedding)
+        return image_id
+
     def find_match(
         self,
         image_id: str,
@@ -108,7 +121,8 @@ class VlcServer:
         else:
             image_match = image_matches[0]
 
-        self.display_method.display_image_pair(vlc_image, image_match, time_ns)
+        if self.display_method:
+            self.display_method.display_image_pair(vlc_image, image_match, time_ns)
         return image_match
 
     def compute_keypoints_descriptors(
@@ -136,6 +150,11 @@ class VlcServer:
             vlc_image = self.vlc_db.update_keypoints(image_id, keypoints, descriptors)
         return vlc_image
 
+    def update_keypoints_decriptors(
+        self, image_id: str, keypoints: np.ndarray, descriptors: np.ndarray
+    ):
+        self.vlc_db.update_keypoints(image_id, keypoints, descriptors)
+
     def compute_loop_closure_pose(
         self,
         session_id: str,
@@ -149,9 +168,10 @@ class VlcServer:
         img_kp_matched, stored_img_kp_matched, query_to_match = self.match_model.infer(
             query_image, match_image
         )
-        self.display_method.display_kp_match_pair(
-            query_image, match_image, img_kp_matched, stored_img_kp_matched, time_ns
-        )
+        if self.display_method:
+            self.display_method.display_kp_match_pair(
+                query_image, match_image, img_kp_matched, stored_img_kp_matched, time_ns
+            )
 
         # Extract pose
         query_camera = self.vlc_db.get_camera(query_image.metadata)
@@ -166,13 +186,14 @@ class VlcServer:
         if not pose_estimate:
             return None
 
-        self.display_method.display_inlier_kp_match_pair(
-            query_image,
-            match_image,
-            query_to_match,
-            pose_estimate.inliers,
-            time_ns,
-        )
+        if self.display_method:
+            self.display_method.display_inlier_kp_match_pair(
+                query_image,
+                match_image,
+                query_to_match,
+                pose_estimate.inliers,
+                time_ns,
+            )
         lc = ob.SparkLoopClosure(
             from_image_uuid=query_image_id,
             to_image_uuid=match_image.metadata.image_uuid,
@@ -233,7 +254,7 @@ class VlcServerConfig(Config):
     lc_frame_lockout_s: int = 10
     place_match_threshold: float = 0.5
     strict_keypoint_evaluation: bool = False
-    display_method: Any = config_field("vlc_server_display", default="opencv")
+    display_method: Any = config_field("vlc_server_display", required=False)
 
     @classmethod
     def load(cls, path: str):

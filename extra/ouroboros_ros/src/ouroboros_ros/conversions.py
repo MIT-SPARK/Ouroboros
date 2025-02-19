@@ -36,18 +36,25 @@ def vlc_pose_to_msg(pose: VlcPose) -> PoseStamped:
     return pose_msg
 
 
-def vlc_image_to_msg(vlc: VlcImage) -> VlcImageMsg:
+def vlc_image_to_msg(
+    vlc: VlcImage,
+    *,
+    convert_image=True,
+    convert_embedding=True,
+    convert_keypoints=True,
+    convert_descriptors=True,
+) -> VlcImageMsg:
     bridge = CvBridge()
     vlc_msg = VlcImageMsg()
-    if vlc.image is not None:
+    if vlc.image is not None and convert_image:
         vlc_msg.image = spark_image_to_msg(vlc.image)
     vlc_msg.header = vlc_msg.image.header
     vlc_msg.metadata = vlc_image_metadata_to_msg(vlc.metadata)
-    if vlc_msg.embedding is not None:
+    if vlc_msg.embedding is not None and convert_embedding:
         vlc_msg.embedding = vlc.embedding.tolist()
-    if vlc.keypoints is not None:
+    if vlc.keypoints is not None and convert_keypoints:
         vlc_msg.keypoints = bridge.cv2_to_imgmsg(vlc.keypoints, encoding="passthrough")
-    if vlc.descriptors is not None:
+    if vlc.descriptors is not None and convert_descriptors:
         vlc_msg.descriptors = bridge.cv2_to_imgmsg(
             vlc.descriptors, encoding="passthrough"
         )

@@ -95,7 +95,6 @@ class VlcServerRos:
         self.images_to_pose = {}
         self.image_pose_lock = threading.Lock()
         self.last_vlc_frame_time = None
-        self.track_new_uuids = None
 
         if self.show_plots:
             plt.ion()
@@ -134,6 +133,14 @@ class VlcServerRos:
             return pinhole
         return None
 
+    def process_new_frame(self, image, stamp_ns, hint_pose):
+        return self.vlc_server.add_and_query_frame(
+            self.session_id,
+            image,
+            stamp_ns,
+            pose_hint=hint_pose,
+        )
+
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
             self.last_vlc_frame_time is None
@@ -171,15 +178,9 @@ class VlcServerRos:
             return
 
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
-        image_uuid, loop_closures = self.vlc_server.add_and_query_frame(
-            self.session_id,
-            spark_image,
-            img_msg.header.stamp.to_nsec(),
-            pose_hint=hint_pose,
+        image_uuid, loop_closures = self.process_new_frame(
+            spark_image, img_msg.header.stamp.to_nsec(), hint_pose
         )
-
-        if self.track_new_uuids is not None:
-            self.track_new_uuids.append(image_uuid)
 
         with self.image_pose_lock:
             self.images_to_pose[image_uuid] = hint_pose

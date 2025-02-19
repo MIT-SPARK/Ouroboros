@@ -116,19 +116,34 @@ class VlcMultirobotServerRos(VlcServerRos):
         response.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
         return response
 
+    def process_new_frame(self, image, stamp_ns, hint_pose):
+        # Need a different one due to sometimes needing to request keypoints
+        new_uuid = self.vlc_server.add_frame(
+            self.session_id,
+            image,
+            stamp_ns,
+            pose_hint=hint_pose,
+        )
+        # TODO)(Yun) fill in
+        self.track_new_uuids.append(new_uuid)
+
+        return new_uuid, None
+
     def embedding_timer_callback(self, event):
         while len(self.track_new_uuids) > 0:
             new_uuid = self.track_new_uuids.pop(0)
-            vlc_img_msg = vlc_image_to_msg(self.vlc_server.get_image(new_uuid))
+            vlc_img_msg = vlc_image_to_msg(
+                self.vlc_server.get_image(new_uuid), convert_image=False
+            )
             self.embedding_publisher.publish(vlc_img_msg)
 
     def client_embedding_callback(self, vlc_img_msg, robot_id):
         # Add image
         vlc_image = vlc_image_from_msg(vlc_img_msg)
         vlc_stamp = vlc_img_msg.header.stamp.to_nsec()
-        new_uuid = self.vlc_server.add_frame(
+        new_uuid = self.vlc_server.add_embedding_no_image(
             self.robot_infos[robot_id].session_id,
-            vlc_image.image,
+            vlc_image.embedding,
             vlc_stamp,
             pose_hint=vlc_image.pose_hint,
         )
@@ -143,10 +158,10 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         # Request keypoints / descriptors
         response = self.keypoint_clients[robot_id](vlc_image.metadata.image_uuid)
-        updated_vlc_img = vlc_image_from_msg(response.vlc_image)
-        vlc_image = self.vlc_server.get_image(new_uuid)
-        vlc_image.keypoints = updated_vlc_img.keypoints
-        vlc_image.descriptors = updated_vlc_img.descriptors
+        vlc_response = vlc_image_from_msg(response.vlc_image)
+        self.vlc_server.update_keypoints_decriptors(
+            new_uuid, vlc_response.keypoints, vlc_response.descriptors
+        )
 
         # Detect loop closures
         self.vlc_server.compute_keypoints_descriptors(matched_img.metadata.image_uuid)
@@ -154,7 +169,7 @@ class VlcMultirobotServerRos(VlcServerRos):
             self.robot_infos[robot_id].session_id,
             new_uuid,
             matched_img.metadata.image_uuid,
-            vlc_image.header.stamp.to_nsec(),
+            vlc_stamp,
         )
 
         if lc_list is None:
@@ -195,4 +210,8 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         self.vlc_server.compute_keypoints_descriptors(request.image_uuid)
         vlc_img = self.vlc_server.get_image(request.image_uuid)
-        return VlcKeypointQueryResponse(vlc_image=vlc_image_to_msg(vlc_img))
+        return VlcKeypointQueryResponse(
+            vlc_image=vlc_image_to_msg(
+                vlc_img, convert_image=False, convert_embedding=False
+            )
+        )
