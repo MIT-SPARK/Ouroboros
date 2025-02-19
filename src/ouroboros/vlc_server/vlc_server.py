@@ -86,7 +86,6 @@ class VlcServer:
 
     def find_match(
         self,
-        session_id: str,
         image_id: str,
         time_ns: int,
     ) -> Optional[str]:
@@ -99,6 +98,7 @@ class VlcServer:
         image_matches, similarities = self.vlc_db.query_embeddings_max_time(
             vlc_image.embedding,
             1,
+            [vlc_image.metadata.session_id],
             time_ns - self.lc_frame_lockout_ns,
             similarity_metric=self.place_model.similarity_metric,
         )
@@ -193,8 +193,8 @@ class VlcServer:
         # Add to database and compute embedding (and optionally keypoints and descriptors)
         query_img_id = self.add_frame(session_id, image, time_ns, pose_hint)
 
-        # Find match using the embeddings. TODO(Yun): change to uuid
-        image_match = self.find_match(session_id, query_img_id, time_ns)
+        # Find match using the embeddings.
+        image_match = self.find_match(query_img_id, time_ns)
 
         # TODO: support multiple possible place descriptor matches
         if image_match is None:
@@ -214,6 +214,12 @@ class VlcServer:
         from_time_ns = self.vlc_db.get_image(lc.from_image_uuid).metadata.epoch_ns
         to_time_ns = self.vlc_db.get_image(lc.to_image_uuid).metadata.epoch_ns
         return from_time_ns, to_time_ns
+
+    def has_image(self, image_uuid: str) -> bool:
+        return self.vlc_db.has_image(image_uuid)
+
+    def get_image(self, image_uuid: str) -> Optional[ob.VlcImage]:
+        return self.vlc_db.get_image(image_uuid)
 
 
 @register_config("vlc_server", name="vlc_server", constructor=VlcServer)

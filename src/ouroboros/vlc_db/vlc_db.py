@@ -41,6 +41,9 @@ class VlcDb:
             session_id, image_timestamp, image, pose_hint
         )
 
+    def has_image(self, image_uuid: str) -> bool:
+        return self._image_table.has_image(image_uuid)
+
     def get_image(self, image_uuid: str) -> VlcImage:
         img = self._image_table.get_image(image_uuid)
         if img is None:
@@ -94,6 +97,7 @@ class VlcDb:
         self,
         embedding: np.ndarray,
         k: int,
+        sessions_to_filter: [str],
         max_time: Union[float, int, datetime],
         similarity_metric: Union[str, callable] = "ip",
     ) -> ([VlcImage], [float]):
@@ -106,7 +110,10 @@ class VlcDb:
         # vectors
 
         def time_filter(_, vlc_image, similarity):
-            return vlc_image.metadata.epoch_ns < max_time
+            return (
+                vlc_image.metadata.epoch_ns < max_time
+                or vlc_image.metadata.session_id not in sessions_to_filter
+            )
 
         ret = self.batch_query_embeddings_filter(
             np.array([embedding]), k, time_filter, similarity_metric

@@ -1,0 +1,3 @@
+string image_uuid
+---
+ouroboros_msgs/VlcImageMsg vlc_image
