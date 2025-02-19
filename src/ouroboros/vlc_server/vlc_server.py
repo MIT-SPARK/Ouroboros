@@ -98,6 +98,7 @@ class VlcServer:
         image_matches, similarities = self.vlc_db.query_embeddings_max_time(
             vlc_image.embedding,
             1,
+            [vlc_image.metadata.session_id],
             time_ns - self.lc_frame_lockout_ns,
             similarity_metric=self.place_model.similarity_metric,
         )
