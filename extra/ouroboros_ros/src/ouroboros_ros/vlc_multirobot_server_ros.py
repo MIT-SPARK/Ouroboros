@@ -110,7 +110,6 @@ class VlcMultirobotServerRos(VlcServerRos):
 
     def process_info_request(self, request):
         response = VlcInfoResponse()
-        response.session_id = self.session_id
         camera_info = CameraInfo()
         camera_info.K = self.camera_config.K.flatten()
         response.camera_info = camera_info
@@ -140,6 +139,8 @@ class VlcMultirobotServerRos(VlcServerRos):
         if matched_img is None:
             return
 
+        rospy.logwarn(f"Found match between robots {robot_id} and {self.robot_id}")
+
         # Request keypoints / descriptors
         response = self.keypoint_clients[robot_id](vlc_image.metadata.image_uuid)
         updated_vlc_img = vlc_image_from_msg(response.vlc_image)
@@ -148,8 +149,8 @@ class VlcMultirobotServerRos(VlcServerRos):
         vlc_image.descriptors = updated_vlc_img.descriptors
 
         # Detect loop closures
-        self.compute_keypoints_descriptors(matched_img.metadata.uuid)
-        lc_list = self.compute_loop_closure_pose(
+        self.vlc_server.compute_keypoints_descriptors(matched_img.metadata.image_uuid)
+        lc_list = self.vlc_server.compute_loop_closure_pose(
             self.robot_infos[robot_id].session_id,
             new_uuid,
             matched_img.metadata.image_uuid,
@@ -158,6 +159,8 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         if lc_list is None:
             return
+
+        rospy.logwarn(f"Found lc between robots {robot_id} and {self.robot_id}")
 
         pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
