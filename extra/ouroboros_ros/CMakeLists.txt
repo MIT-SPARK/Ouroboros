@@ -3,7 +3,6 @@ project(ouroboros_ros)
 
 find_package(catkin REQUIRED COMPONENTS
     rospy
-    ouroboros_msgs
     dynamic_reconfigure
 )
 
@@ -16,5 +15,4 @@ generate_dynamic_reconfigure_options(
 catkin_package(
   CATKIN_DEPENDS
     rospy
-    ouroboros_msgs
 )

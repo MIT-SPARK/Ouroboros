@@ -31,5 +31,5 @@ jobs:
       - name: Install Ouroboros
         run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
       - name: Run test script
-        run: cd ${{ github.workspace }}/ouroboros_repo && pytest --ignore=third_party --ignore=extra/ouroboros_ros
+        run: cd ${{ github.workspace }}/ouroboros_repo && pytest --ignore=third_party
       - run: echo "🍏 This job's status is ${{ job.status }}."
