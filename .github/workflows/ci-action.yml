@@ -54,18 +54,13 @@ jobs:
           sudo apt-get install -y python3-catkin-tools
           sudo apt-get install -y python3-rosdep
           sudo apt-get install -y python3-wstool
-      - name: Check if ROS folder exists
+      - name: Check if ROS installed
         run: |
           if [ -d "/opt/ros/noetic" ]; then
             echo "ROS Noetic is installed!"
-            ls /opt/ros/noetic
           else
             echo "ROS Noetic is NOT installed!"
           fi
-      - name: List contents
-        run: |
-          echo "Listing contents of ${{ github.workspace }}:"
-          ls -alh ${{ github.workspace }}
       - name: Install ROS packages with rosdep
         run: |
           source /opt/ros/noetic/setup.bash
