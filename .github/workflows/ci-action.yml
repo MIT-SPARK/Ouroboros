@@ -31,5 +31,15 @@ jobs:
       - name: Install Ouroboros
         run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
       - name: Run test script
-        run: cd ${{ github.workspace }}/ouroboros_repo && pytest --ignore=third_party
+        run: cd ${{ github.workspace }}/ouroboros_repo && pytest --ignore=third_party --ignore=extra/ouroboros_ros
       - run: echo "🍏 This job's status is ${{ job.status }}."
+
+  Ouroboros-ROS-CI:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:focal
+    steps:
+      - uses: ros-tooling/action-ros-ci@v0.3
+        with:
+          package-name:
+          target-ros1-distro: noetic
