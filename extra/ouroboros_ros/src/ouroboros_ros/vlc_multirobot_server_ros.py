@@ -134,10 +134,11 @@ class VlcMultirobotServerRos(VlcServerRos):
         if image_match is None:
             return new_uuid, None
 
-        if image_match.keypoints is None:
-            match_uuid = image_match.metadata.image_uuid
-            remapped_match_uuid = self.uuid_map[match_uuid]
+        match_uuid = image_match.metadata.image_uuid
 
+        interrobot = self.session_id != image_match.metadata.session_id
+        if image_match.keypoints is None and interrobot:
+            remapped_match_uuid = self.uuid_map[match_uuid]
             # Request keypoint and descriptors for match
             robot_id = self.session_robot_map[image_match.metadata.session_id]
             response = self.keypoint_clients[robot_id](remapped_match_uuid)
@@ -145,9 +146,17 @@ class VlcMultirobotServerRos(VlcServerRos):
             self.vlc_server.update_keypoints_decriptors(
                 match_uuid, vlc_response.keypoints, vlc_response.descriptors
             )
+            self.vlc_server.update_keypoint_depths(
+                match_uuid, vlc_response.keypoint_depths
+            )
+
+        elif not interrobot:
+            self.vlc_server.compute_keypoints_descriptors(
+                match_uuid, compute_depths=True
+            )
 
         # Compute self keypoints and descriptors
-        self.vlc_server.compute_keypoints_descriptors(new_uuid)
+        self.vlc_server.compute_keypoints_descriptors(new_uuid, compute_depths=True)
 
         lc_list = self.vlc_server.compute_loop_closure_pose(
             self.session_id, new_uuid, image_match.metadata.image_uuid, stamp_ns
@@ -176,7 +185,9 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.uuid_map[new_uuid] = vlc_image.metadata.image_uuid
 
         # Find match
-        matched_img = self.vlc_server.find_match(new_uuid, vlc_stamp)
+        matched_img = self.vlc_server.find_match(
+            new_uuid, vlc_stamp, search_sessions=[self.session_id]
+        )
         if matched_img is None:
             return
 
@@ -188,9 +199,12 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.vlc_server.update_keypoints_decriptors(
             new_uuid, vlc_response.keypoints, vlc_response.descriptors
         )
+        self.vlc_server.update_keypoint_depths(new_uuid, vlc_response.keypoint_depths)
 
         # Detect loop closures
-        self.vlc_server.compute_keypoints_descriptors(matched_img.metadata.image_uuid)
+        self.vlc_server.compute_keypoints_descriptors(
+            matched_img.metadata.image_uuid, compute_depths=True
+        )
         lc_list = self.vlc_server.compute_loop_closure_pose(
             self.robot_infos[robot_id].session_id,
             new_uuid,
@@ -234,7 +248,9 @@ class VlcMultirobotServerRos(VlcServerRos):
             rospy.logwarn(f"Image ID {request.id} not found!")
             return VlcKeypointQueryResponse()
 
-        self.vlc_server.compute_keypoints_descriptors(request.image_uuid)
+        self.vlc_server.compute_keypoints_descriptors(
+            request.image_uuid, compute_depths=True
+        )
         vlc_img = self.vlc_server.get_image(request.image_uuid)
         return VlcKeypointQueryResponse(
             vlc_image=vlc_image_to_msg(
