@@ -116,9 +116,7 @@ class VlcServerRos:
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
 
-        self.body_T_cam = get_tf_as_pose(
-            self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
-        )
+        self.body_T_cam = self.get_body_T_cam_ros()
 
     def get_camera_config_ros(self):
         rate = rospy.Rate(10)
@@ -131,6 +129,18 @@ class VlcServerRos:
                 continue
             pinhole = parse_camera_info(info_msg)
             return pinhole
+        return None
+
+    def get_body_T_cam_ros(self, max_retries=10, retry_delay=0.5):
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            try:
+                return get_tf_as_pose(
+                    self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
+                )
+            except rospy.ROSException:
+                rospy.logerr("Failed to get body_T_cam transform")
+                rate.sleep()
         return None
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
