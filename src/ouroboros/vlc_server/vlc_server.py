@@ -98,9 +98,7 @@ class VlcServer:
         return image_id
 
     def find_match(
-        self,
-        image_id: str,
-        time_ns: int,
+        self, image_id: str, time_ns: int, search_sessions: Optional[List[str]] = None
     ) -> Optional[str]:
         vlc_image = self.vlc_db.get_image(image_id)
         if vlc_image.embedding is None:
@@ -114,6 +112,7 @@ class VlcServer:
             [vlc_image.metadata.session_id],
             time_ns - self.lc_frame_lockout_ns,
             similarity_metric=self.place_model.similarity_metric,
+            search_sessions=search_sessions,
         )
 
         if len(similarities) == 0 or similarities[0] < self.place_match_threshold:
@@ -126,8 +125,7 @@ class VlcServer:
         return image_match
 
     def compute_keypoints_descriptors(
-        self,
-        image_id: str,
+        self, image_id: str, compute_depths=False
     ) -> ob.VlcImage:
         vlc_image = self.vlc_db.get_image(image_id)
         updated = False
@@ -148,12 +146,20 @@ class VlcServer:
                 updated = True
         if updated:
             vlc_image = self.vlc_db.update_keypoints(image_id, keypoints, descriptors)
+            if compute_depths:
+                keypoint_depths = vlc_image.get_feature_depths()
+                vlc_image = self.vlc_db.update_keypoint_depths(
+                    image_id, keypoint_depths
+                )
         return vlc_image
 
     def update_keypoints_decriptors(
         self, image_id: str, keypoints: np.ndarray, descriptors: np.ndarray
     ):
         self.vlc_db.update_keypoints(image_id, keypoints, descriptors)
+
+    def update_keypoint_depths(self, image_id: str, keypoint_depths: np.ndarray):
+        self.vlc_db.update_keypoint_depths(image_id, keypoint_depths)
 
     def compute_loop_closure_pose(
         self,

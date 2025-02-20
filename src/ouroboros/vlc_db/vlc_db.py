@@ -97,9 +97,10 @@ class VlcDb:
         self,
         embedding: np.ndarray,
         k: int,
-        sessions_to_filter: [str],
+        sessions_to_time_filter: [str],
         max_time: Union[float, int, datetime],
         similarity_metric: Union[str, callable] = "ip",
+        search_sessions: Optional[List[str]] = None,
     ) -> ([VlcImage], [float]):
         """Query image embeddings to find the k closest vectors with timestamp older than max_time."""
 
@@ -109,14 +110,24 @@ class VlcDb:
         # this to be more efficient and not iterate through the full set of
         # vectors
 
+        def session_filter(_, vlc_image, similarity):
+            if search_sessions is None:
+                return True
+            return vlc_image.metadata.session_id in search_sessions
+
         def time_filter(_, vlc_image, similarity):
             return (
                 vlc_image.metadata.epoch_ns < max_time
-                or vlc_image.metadata.session_id not in sessions_to_filter
+                or vlc_image.metadata.session_id not in sessions_to_time_filter
+            )
+
+        def combined_filter(_, vlc_image, similarity):
+            return time_filter(_, vlc_image, similarity) and session_filter(
+                _, vlc_image, similarity
             )
 
         ret = self.batch_query_embeddings_filter(
-            np.array([embedding]), k, time_filter, similarity_metric
+            np.array([embedding]), k, combined_filter, similarity_metric
         )
         matches = [t[2] for t in ret[0]]
         similarities = [t[0] for t in ret[0]]
@@ -215,6 +226,10 @@ class VlcDb:
         self._image_table.update_keypoints(
             image_uuid, keypoints, descriptors=descriptors
         )
+        return self.get_image(image_uuid)
+
+    def update_keypoint_depths(self, image_uuid: str, keypoint_depths):
+        self._image_table.update_keypoint_depths(image_uuid, keypoint_depths)
         return self.get_image(image_uuid)
 
     def get_keypoints(self, image_uuid: str):

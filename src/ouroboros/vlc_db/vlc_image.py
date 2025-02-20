@@ -23,9 +23,9 @@ class VlcImage:
     descriptors: np.ndarray = None
     pose_hint: VlcPose = None
 
-    def compute_feature_depths(self) -> bool:
+    def get_feature_depths(self):
         """
-        Update depth corresponding to the keypoints for image features.
+        Get depth corresponding to the keypoints for image features.
 
         Note that this has hard-to-detect artifacts from features at the boundary
         of an image. We clip all keypoints to be inside the image with the assumption
@@ -35,13 +35,13 @@ class VlcImage:
             data: Image to extract depth from
 
         Returns:
-            bool: If possible to extract
+            Optiona[np.ndarray]: Depths for keypoints if possible to extract
         """
         if self.keypoints is None:
-            return False
+            return None
 
-        if self.image.depth is None:
-            return False
+        if self.image is None or self.image.depth is None:
+            return None
 
         # NOTE(nathan) this is ugly, but:
         #   - To index into the image we need to swap from (u, v) to (row, col)
@@ -53,5 +53,4 @@ class VlcImage:
         coords = np.clip(np.round(self.keypoints), a_min=[0, 0], a_max=limit).astype(
             np.int64
         )
-        self.keypoint_depths = self.image.depth[coords[:, 1], coords[:, 0]]
-        return True
+        return self.image.depth[coords[:, 1], coords[:, 0]]
