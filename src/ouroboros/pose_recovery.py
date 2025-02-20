@@ -75,9 +75,10 @@ class FeatureGeometry:
     ):
         """Get undistorted geometry from keypoints."""
         if img.keypoint_depths is None:
-            img.compute_feature_depths()
+            depths = img.get_feature_depths()
+        else:
+            depths = img.keypoint_depths
 
-        depths = img.keypoint_depths
         keypoints = img.keypoints
         if indices is not None:
             keypoints = keypoints[indices, :]
