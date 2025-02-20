@@ -19,12 +19,13 @@ class VlcImage:
     image: SparkImage
     embedding: np.ndarray = None
     keypoints: np.ndarray = None
+    keypoint_depths: np.ndarray = None
     descriptors: np.ndarray = None
     pose_hint: VlcPose = None
 
-    def get_feature_depths(self):
+    def compute_feature_depths(self) -> bool:
         """
-        Get depth corresponding to the keypoints for image features.
+        Update depth corresponding to the keypoints for image features.
 
         Note that this has hard-to-detect artifacts from features at the boundary
         of an image. We clip all keypoints to be inside the image with the assumption
@@ -34,13 +35,13 @@ class VlcImage:
             data: Image to extract depth from
 
         Returns:
-            Optiona[np.ndarray]: Depths for keypoints if possible to extract
+            bool: If possible to extract
         """
         if self.keypoints is None:
-            return None
+            return False
 
         if self.image.depth is None:
-            return None
+            return False
 
         # NOTE(nathan) this is ugly, but:
         #   - To index into the image we need to swap from (u, v) to (row, col)
@@ -52,4 +53,5 @@ class VlcImage:
         coords = np.clip(np.round(self.keypoints), a_min=[0, 0], a_max=limit).astype(
             np.int64
         )
-        return self.image.depth[coords[:, 1], coords[:, 0]]
+        self.keypoint_depths = self.image.depth[coords[:, 1], coords[:, 0]]
+        return True

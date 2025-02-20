@@ -19,9 +19,13 @@ class LightglueModel:
         self, image0: ob.VlcImage, image1: ob.VlcImage, pose_hint: ob.VlcPose = None
     ):
         # Lightglue / Superpoint seem to expect (y,x) keypoints, but ours are storted in (x,y)
-        kp0 = torch.Tensor(np.expand_dims(image0.keypoints[:, ::-1], axis=0)).cuda()
+        kp0 = torch.Tensor(
+            np.expand_dims(image0.keypoints[:, ::-1].copy(), axis=0)
+        ).cuda()
         desc0 = torch.Tensor(np.expand_dims(image0.descriptors, axis=0)).cuda()
-        kp1 = torch.Tensor(np.expand_dims(image1.keypoints[:, ::-1], axis=0)).cuda()
+        kp1 = torch.Tensor(
+            np.expand_dims(image1.keypoints[:, ::-1].copy(), axis=0)
+        ).cuda()
         desc1 = torch.Tensor(np.expand_dims(image1.descriptors, axis=0)).cuda()
 
         with torch.no_grad():
