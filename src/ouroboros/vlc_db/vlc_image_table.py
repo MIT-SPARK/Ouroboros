@@ -17,6 +17,7 @@ class VlcImageTable:
         self.image_store = {}
         self.embedding_store = InvertibleVectorStore(image_embedding_dimension)
         self.keypoints_store = {}
+        self.keypoint_depths_store = {}
         self.descriptors_store = {}
         self.pose_store = {}
 
@@ -33,10 +34,13 @@ class VlcImageTable:
         else:
             embedding = None
         keypoints = self.keypoints_store[image_uuid]
+        keypoint_depths = self.keypoint_depths_store[image_uuid]
         descriptors = self.descriptors_store[image_uuid]
         pose = self.pose_store[image_uuid]
 
-        vlc_image = VlcImage(metadata, image, embedding, keypoints, descriptors, pose)
+        vlc_image = VlcImage(
+            metadata, image, embedding, keypoints, keypoint_depths, descriptors, pose
+        )
         return vlc_image
 
     def get_image_keys(self):
@@ -92,6 +96,7 @@ class VlcImageTable:
         self.image_store[new_uuid] = image
         self.pose_store[new_uuid] = pose_hint
         self.keypoints_store[new_uuid] = None
+        self.keypoint_depths_store[new_uuid] = None
         self.descriptors_store[new_uuid] = None
         return new_uuid
 
@@ -104,8 +109,14 @@ class VlcImageTable:
             assert len(keypoints) == len(descriptors)
         self.descriptors_store[image_uuid] = descriptors
 
+    def update_keypoint_depths(self, image_uuid: str, keypoint_depths):
+        self.keypoint_depths_store[image_uuid] = keypoint_depths
+
     def get_keypoints(self, image_uuid: str):
         return self.keypoints_store[image_uuid], self.descriptors_store[image_uuid]
+
+    def get_keypoint_depths(self, image_uuid: str):
+        return self.keypoint_depths_store[image_uuid]
 
     def drop_image(self, image_uuid: str):
         """This functionality is for marginalization / sparsification of history"""
