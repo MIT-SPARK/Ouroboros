@@ -1,0 +1,48 @@
+name: Ouroboros-ROS-CI
+run-name: Ouroboros-ROS-CI
+on:
+    push:
+        branches: main
+    pull_request:
+        branches:
+            - main
+            - develop
+jobs:
+  Ouroboros-ROS-CI:
+    runs-on: ubuntu-latest
+    container: ros:noetic-ros-base-focal
+    steps:
+      - name: Update git
+        run: sudo apt update && sudo apt install -y git
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+            path: src/ouroboros_repo
+            submodules: recursive
+      - name: Dependencies
+        run: |
+            sudo apt install -y libeigen3-dev pkg-config ros-noetic-cv-bridge python3-pip
+            sudo pip install --upgrade pip
+            sudo python3 -m pip install catkin_tools empy catkin_pkg
+      - name: Install Ouroboros
+        run: pwd && ls && cd src/ouroboros_repo && pwd && pip install .
+
+      - name: Install ROS packages with rosdep
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          rosdep update
+          rosdep install --from-paths src --ignore-src -r -s  # do a dry-run first
+          rosdep install --from-paths src --ignore-src -r -y
+      - name: catkin build
+        shell: bash
+        run: |
+          source /opt/ros/noetic/setup.bash
+          catkin build -s
+      - name: Run test script
+        shell: bash
+        run: |
+          source devel/setup.bash
+          cd src/ouroboros_repo
+          pytest extra/ouroboros_ros/tests
+      - run: echo "🍏 This job's status is ${{ job.status }}."
