@@ -77,10 +77,8 @@ jobs:
           cd ~/catkin_ws
           catkin build -s
           source devel/setup.bash
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.8"
+      - name: Install pytest
+        run: pip install pytest
       - name: Run test script
         run: cd ~/catkin_ws/src/ouroboros_repo && pytest --ignore=third_party
       - run: echo "🍏 This job's status is ${{ job.status }}."
