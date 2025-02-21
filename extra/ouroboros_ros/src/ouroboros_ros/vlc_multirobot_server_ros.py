@@ -2,10 +2,8 @@
 from dataclasses import dataclass
 
 import rospy
-from ouroboros_msgs.msg import VlcImageMsg
+from ouroboros_msgs.msg import VlcImageMsg, VlcInfoMsg
 from ouroboros_msgs.srv import (
-    VlcInfo,
-    VlcInfoResponse,
     VlcKeypointQuery,
     VlcKeypointQueryResponse,
 )
@@ -30,7 +28,7 @@ class RobotInfo:
     body_T_cam: ob.VlcPose = None
 
     @classmethod
-    def from_service_response(cls, resp: VlcInfoResponse):
+    def from_info_msg(cls, resp: VlcInfoMsg):
         camera_config = parse_camera_info(resp.camera_info)
         body_T_cam = vlc_pose_from_msg(resp.body_T_cam)
         return cls(
@@ -47,7 +45,6 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.track_new_uuids = []
 
         # Spin up robot info server
-        self.servers = rospy.get_param("~servers")
         self.clients = rospy.get_param("~clients")
 
         # Publish embeddings
@@ -66,57 +63,65 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         self.embedding_subscribers = []
         self.keypoint_clients = {}
-        for client_id in self.clients:
-            # Subscribe to embeddings
-            self.embedding_subscribers.append(
-                rospy.Subscriber(
-                    f"/robot_{client_id}/vlc_embedding",
-                    VlcImageMsg,
-                    self.client_embedding_callback,
-                    callback_args=client_id,
-                )
-            )
-            # Keypoint request client
-            self.keypoint_clients[client_id] = rospy.ServiceProxy(
-                f"/robot_{client_id}/vlc_keypoints_request", VlcKeypointQuery
-            )
 
-        self.info_server = rospy.Service(
-            f"/robot_{self.robot_id}/vlc_info", VlcInfo, self.process_info_request
+        # Publish info as discovery
+        self.info_timer = rospy.Timer(rospy.Duration(5), self.info_timer_callback)
+        self.info_publisher = rospy.Publisher("/vlc_info", VlcInfoMsg)
+
+        # Subscribe to other robots' infos as discovery
+        self.info_subscriber = rospy.Subscriber(
+            "/vlc_info", VlcInfoMsg, self.vlc_info_callback
         )
 
         self.robot_infos = {}
         self.uuid_map = {}
         self.session_robot_map = {}
-        self.get_robot_infos(self.servers + self.clients)
 
-    def get_robot_infos(self, robot_ids, timeout=5.0):
-        for robot_id in robot_ids:
-            service_name = f"/robot_{robot_id}/vlc_info"
-            try:
-                rospy.wait_for_service(service_name, timeout)
-            except rospy.ROSException as e:
-                rospy.logerr(
-                    f"Timeout: Service {service_name} not available within {timeout} seconds. Exception: {e}"
-                )
-            info_client = rospy.ServiceProxy(service_name, VlcInfo)
-            response = info_client()
-            self.robot_infos[robot_id] = RobotInfo.from_service_response(response)
-            # Assign session_id
-            self.robot_infos[robot_id].session_id = self.vlc_server.register_camera(
-                robot_id,
-                self.robot_infos[robot_id].camera_config,
-                rospy.Time.now().to_nsec(),
-            )
-            self.session_robot_map[self.robot_infos[robot_id].session_id] = robot_id
-
-    def process_info_request(self, request):
-        response = VlcInfoResponse()
+    def info_timer_callback(self, event):
+        # NOTE(Yun) maybe should terminate this? But there's a case where a new server shows up
+        info_msg = VlcInfoMsg()
+        info_msg.robot_id = self.robot_id
         camera_info = CameraInfo()
         camera_info.K = self.camera_config.K.flatten()
-        response.camera_info = camera_info
-        response.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
-        return response
+        info_msg.camera_info = camera_info
+        info_msg.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
+        self.info_publisher.publish(info_msg)
+
+    def vlc_info_callback(self, info_msg):
+        # Note(Yun) alternatively define server(s) in msg
+        if info_msg.robot_id not in self.clients:
+            # Not handling this robot
+            return
+
+        if info_msg.robot_id in self.robot_infos:
+            # Already initialized
+            return
+
+        self.robot_infos[info_msg.robot_id] = RobotInfo.from_info_msg(info_msg)
+        # Assign session_id
+        self.robot_infos[
+            info_msg.robot_id
+        ].session_id = self.vlc_server.register_camera(
+            info_msg.robot_id,
+            self.robot_infos[info_msg.robot_id].camera_config,
+            rospy.Time.now().to_nsec(),
+        )
+        self.session_robot_map[self.robot_infos[info_msg.robot_id].session_id] = (
+            info_msg.robot_id
+        )
+        # Subscribe to embeddings
+        self.embedding_subscribers.append(
+            rospy.Subscriber(
+                f"/robot_{info_msg.robot_id}/vlc_embedding",
+                VlcImageMsg,
+                self.client_embedding_callback,
+                callback_args=info_msg.robot_id,
+            )
+        )
+        # Keypoint request client
+        self.keypoint_clients[info_msg.robot_id] = rospy.ServiceProxy(
+            f"/robot_{info_msg.robot_id}/vlc_keypoints_request", VlcKeypointQuery
+        )
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
         # Need a different one due to sometimes needing to request keypoints
