@@ -2,3 +2,5 @@ uint8 robot_id
 sensor_msgs/CameraInfo camera_info
 geometry_msgs/PoseStamped body_T_cam
 
+string embedding_topic
+string keypoints_service

@@ -52,11 +52,12 @@ class VlcMultirobotServerRos(VlcServerRos):
             rospy.Duration(5), self.embedding_timer_callback
         )
         self.embedding_publisher = rospy.Publisher(
-            f"robot_{self.robot_id}/vlc_embedding", VlcImageMsg, queue_size=10
+            "vlc_embedding", VlcImageMsg, queue_size=10
         )
+
         # Keypoint request server
         self.keypoint_server = rospy.Service(
-            f"robot_{self.robot_id}/vlc_keypoints_request",
+            "vlc_keypoints_request",
             VlcKeypointQuery,
             self.process_keypoints_request,
         )
@@ -85,6 +86,9 @@ class VlcMultirobotServerRos(VlcServerRos):
         camera_info.K = self.camera_config.K.flatten()
         info_msg.camera_info = camera_info
         info_msg.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
+
+        info_msg.embedding_topic = rospy.resolve_name("vlc_embedding")
+        info_msg.keypoints_service = rospy.resolve_name("vlc_keypoints_request")
         self.info_publisher.publish(info_msg)
 
     def vlc_info_callback(self, info_msg):
@@ -112,7 +116,7 @@ class VlcMultirobotServerRos(VlcServerRos):
         # Subscribe to embeddings
         self.embedding_subscribers.append(
             rospy.Subscriber(
-                f"/robot_{info_msg.robot_id}/vlc_embedding",
+                info_msg.embedding_topic,
                 VlcImageMsg,
                 self.client_embedding_callback,
                 callback_args=info_msg.robot_id,
@@ -120,7 +124,7 @@ class VlcMultirobotServerRos(VlcServerRos):
         )
         # Keypoint request client
         self.keypoint_clients[info_msg.robot_id] = rospy.ServiceProxy(
-            f"/robot_{info_msg.robot_id}/vlc_keypoints_request", VlcKeypointQuery
+            info_msg.keypoints_service, VlcKeypointQuery
         )
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
@@ -250,7 +254,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
     def process_keypoints_request(self, request):
         if not self.vlc_server.has_image(request.image_uuid):
-            rospy.logwarn(f"Image ID {request.id} not found!")
+            rospy.logwarn(f"Image ID {request.image_uuid} not found!")
             return VlcKeypointQueryResponse()
 
         self.vlc_server.compute_keypoints_descriptors(
