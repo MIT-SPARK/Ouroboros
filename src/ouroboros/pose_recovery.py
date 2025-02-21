@@ -74,7 +74,11 @@ class FeatureGeometry:
         cls, cam: PinholeCamera, img: VlcImage, indices: Optional[np.ndarray] = None
     ):
         """Get undistorted geometry from keypoints."""
-        depths = img.get_feature_depths()
+        if img.keypoint_depths is None:
+            depths = img.get_feature_depths()
+        else:
+            depths = img.keypoint_depths
+
         keypoints = img.keypoints
         if indices is not None:
             keypoints = keypoints[indices, :]

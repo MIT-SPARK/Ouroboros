@@ -129,16 +129,22 @@ def test_query_embeddings_max_time():
     c_id = vlc_db.add_image(session_id, 20, None)
     vlc_db.update_embedding(c_id, np.array([0, 0, 1]))
 
-    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 1, 15)
+    imgs, sims = vlc_db.query_embeddings_max_time(
+        np.array([0, 0, 1]), 1, [session_id], 15
+    )
 
     assert imgs[0].metadata.image_uuid == a_id
 
-    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 2, 15)
+    imgs, sims = vlc_db.query_embeddings_max_time(
+        np.array([0, 0, 1]), 2, [session_id], 15
+    )
 
     assert imgs[0].metadata.image_uuid == a_id
     assert imgs[1].metadata.image_uuid == b_id
 
-    imgs, sims = vlc_db.query_embeddings_max_time(np.array([0, 0, 1]), 3, 15)
+    imgs, sims = vlc_db.query_embeddings_max_time(
+        np.array([0, 0, 1]), 3, [session_id], 15
+    )
 
     assert len(imgs) == 2
 

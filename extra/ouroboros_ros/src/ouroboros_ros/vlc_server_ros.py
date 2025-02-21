@@ -8,13 +8,16 @@ import message_filters
 import numpy as np
 import rospy
 import tf2_ros
-from pose_graph_tools_msgs.msg import PoseGraph, PoseGraphEdge
-from scipy.spatial.transform import Rotation as R
+from pose_graph_tools_msgs.msg import PoseGraph
 from sensor_msgs.msg import CameraInfo, Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
-from ouroboros_ros.utils import get_tf_as_pose
+from ouroboros_ros.utils import (
+    build_robot_lc_message,
+    get_tf_as_pose,
+    parse_camera_info,
+)
 
 
 def update_plot(line, pts, images_to_pose):
@@ -56,38 +59,6 @@ def get_query_and_est_match_position(lc, image_to_pose, body_T_cam):
     return query_position, est_match_position
 
 
-def build_lc_message(
-    key_from_ns,
-    key_to_ns,
-    robot_id,
-    from_T_to,
-    pose_cov,
-    body_T_cam,
-):
-    bodyfrom_T_bodyto = body_T_cam @ from_T_to @ ob.invert_pose(body_T_cam)
-    relative_position = bodyfrom_T_bodyto[:3, 3]
-    relative_orientation = R.from_matrix(bodyfrom_T_bodyto[:3, :3])
-
-    lc_edge = PoseGraphEdge()
-    lc_edge.header.stamp = rospy.Time.now()
-    lc_edge.key_from = key_from_ns
-    lc_edge.key_to = key_to_ns
-    lc_edge.robot_from = 0
-    lc_edge.robot_to = 0
-    lc_edge.type = PoseGraphEdge.LOOPCLOSE
-    lc_edge.pose.position.x = relative_position[0]
-    lc_edge.pose.position.y = relative_position[1]
-    lc_edge.pose.position.z = relative_position[2]
-    q = relative_orientation.as_quat()
-    lc_edge.pose.orientation.x = q[0]
-    lc_edge.pose.orientation.y = q[1]
-    lc_edge.pose.orientation.z = q[2]
-    lc_edge.pose.orientation.w = q[3]
-
-    lc_edge.covariance = pose_cov.flatten()
-    return lc_edge
-
-
 class VlcServerRos:
     def __init__(self):
         self.tf_buffer = tf2_ros.Buffer()
@@ -111,13 +82,13 @@ class VlcServerRos:
         server_config = ob.VlcServerConfig.load(config_path)
         self.vlc_server = ob.VlcServer(
             server_config,
-            robot_id=0,
+            robot_id=self.robot_id,
         )
 
-        camera_config = self.get_camera_config_ros()
-        print(f"camera config: {camera_config}")
+        self.camera_config = self.get_camera_config_ros()
+        print(f"camera config: {self.camera_config}")
         self.session_id = self.vlc_server.register_camera(
-            0, camera_config, rospy.Time.now().to_nsec()
+            self.robot_id, self.camera_config, rospy.Time.now().to_nsec()
         )
 
         self.loop_rate = rospy.Rate(10)
@@ -145,6 +116,8 @@ class VlcServerRos:
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
 
+        self.body_T_cam = self.get_body_T_cam_ros()
+
     def get_camera_config_ros(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
@@ -154,14 +127,29 @@ class VlcServerRos:
                 rospy.logerr("Timed out waiting for camera info")
                 rate.sleep()
                 continue
-            break
-        K = np.array(info_msg.K).reshape((3, 3))
-        fx = K[0, 0]
-        fy = K[1, 1]
-        cx = K[0, 2]
-        cy = K[1, 2]
-        pinhole = ob.PinholeCamera(fx=fx, fy=fy, cx=cx, cy=cy)
-        return pinhole
+            pinhole = parse_camera_info(info_msg)
+            return pinhole
+        return None
+
+    def get_body_T_cam_ros(self, max_retries=10, retry_delay=0.5):
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            try:
+                return get_tf_as_pose(
+                    self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
+                )
+            except rospy.ROSException:
+                rospy.logerr("Failed to get body_T_cam transform")
+                rate.sleep()
+        return None
+
+    def process_new_frame(self, image, stamp_ns, hint_pose):
+        return self.vlc_server.add_and_query_frame(
+            self.session_id,
+            image,
+            stamp_ns,
+            pose_hint=hint_pose,
+        )
 
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
@@ -199,17 +187,11 @@ class VlcServerRos:
             print("Cannot get current pose, skipping frame!")
             return
 
-        body_T_cam = get_tf_as_pose(
-            self.tf_buffer, self.body_frame, self.camera_frame, img_msg.header.stamp
-        ).as_matrix()
-
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
-        image_uuid, loop_closures = self.vlc_server.add_and_query_frame(
-            self.session_id,
-            spark_image,
-            img_msg.header.stamp.to_nsec(),
-            pose_hint=hint_pose,
+        image_uuid, loop_closures = self.process_new_frame(
+            spark_image, img_msg.header.stamp.to_nsec(), hint_pose
         )
+
         with self.image_pose_lock:
             self.images_to_pose[image_uuid] = hint_pose
 
@@ -223,7 +205,7 @@ class VlcServerRos:
             if self.show_plots:
                 with self.image_pose_lock:
                     query_pos, match_pos = get_query_and_est_match_position(
-                        lc, self.images_to_pose, body_T_cam
+                        lc, self.images_to_pose, self.body_T_cam.as_matrix()
                     )
                     true_match_pos = self.images_to_pose[lc.to_image_uuid].position
                 if not lc.is_metric:
@@ -239,13 +221,13 @@ class VlcServerRos:
 
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
 
-            lc_edge = build_lc_message(
+            lc_edge = build_robot_lc_message(
                 from_time_ns,
                 to_time_ns,
                 self.robot_id,
                 lc.f_T_t,
                 pose_cov_mat,
-                body_T_cam,
+                self.body_T_cam.as_matrix(),
             )
 
             pg.edges.append(lc_edge)

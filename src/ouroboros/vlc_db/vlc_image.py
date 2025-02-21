@@ -19,6 +19,7 @@ class VlcImage:
     image: SparkImage
     embedding: np.ndarray = None
     keypoints: np.ndarray = None
+    keypoint_depths: np.ndarray = None
     descriptors: np.ndarray = None
     pose_hint: VlcPose = None
 
@@ -39,7 +40,7 @@ class VlcImage:
         if self.keypoints is None:
             return None
 
-        if self.image.depth is None:
+        if self.image is None or self.image.depth is None:
             return None
 
         # NOTE(nathan) this is ugly, but:
