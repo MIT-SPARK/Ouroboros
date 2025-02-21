@@ -80,5 +80,5 @@ jobs:
       - name: Install Ouroboros
         run: cd ~/catkin_ws/src/ouroboros_repo && python -m pip install --upgrade pip && pip install .
       - name: Run test script
-        run: cd ~/catkin_ws/src/ouroboros_repo && pytest --ignore=third_party
+        run: cd ~/catkin_ws/src/ouroboros_repo && source ~/catkin_ws/devel/setup.bash && pytest --ignore=third_party
       - run: echo "🍏 This job's status is ${{ job.status }}."
