@@ -11,18 +11,3 @@ addopts = ["--cov-report=term-missing"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
-
-[tool.tox]
-requires = ["tox>=4"]
-skip_missing_interpreters = true
-#env_list = ["3.8", "3.9", "3.10"]
-env_list = ["3.8"]
-
-[tool.tox.env_run_base]
-description = "run unit tests"
-deps = [
-    "pytest>=8",
-    "pytest-sugar",
-    "pytest-cov",
-]
-commands = [["pytest", "tests", "--cov={envsitepackagesdir}/ouroboros", "--cov-report=term-missing", { replace = "posargs", default = ["-vv"], extend = true }]]
