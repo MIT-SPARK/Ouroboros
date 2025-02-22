@@ -2,28 +2,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+
 import ouroboros as ob
 from ouroboros.config import Config, register_config
 from ouroboros.vlc_db.vlc_pose import invert_pose, pose_from_quat_trans
 
 
-def recover_pose(query_pose, match_pose):
-    w_T_cur = pose_from_quat_trans(query_pose.rotation, query_pose.position)
-    w_T_old = pose_from_quat_trans(match_pose.rotation, match_pose.position)
-
-    old_T_new = invert_pose(invert_pose(w_T_old) @ w_T_cur)
-
-    return old_T_new
+def _recover_pose(query_pose, match_pose):
+    w_T_query = pose_from_quat_trans(query_pose.rotation, query_pose.position)
+    w_T_match = pose_from_quat_trans(match_pose.rotation, match_pose.position)
+    match_T_query = invert_pose(w_T_match) @ w_T_query
+    return match_T_query
 
 
 class GtPoseModel:
     def __init__(self, config: GtPoseModel):
         pass
 
-    def infer(self, query_image: ob.VlcImage, match_image: ob.VlcImage):
-        p1 = query_image.pose_hint
-        p2 = match_image.pose_hint
-        return recover_pose(p1, p2)
+    def recover_pose(
+        self,
+        query_camera: ob.PinholeCamera,
+        query: ob.VlcImage,
+        match_camera: ob.PinholeCamera,
+        match: ob.VlcImage,
+        query_to_match: np.ndarray,
+    ):
+        p1 = query.pose_hint
+        p2 = match.pose_hint
+        match_T_query = _recover_pose(p1, p2)
+        return ob.PoseRecoveryResult.metric(match_T_query)
 
 
 @register_config("pose_model", name="ground_truth", constructor=GtPoseModel)
