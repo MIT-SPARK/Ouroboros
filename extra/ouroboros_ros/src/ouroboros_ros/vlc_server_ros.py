@@ -68,8 +68,13 @@ class VlcServerRos:
 
         self.fixed_frame = rospy.get_param("~fixed_frame")
         self.hint_body_frame = rospy.get_param("~hint_body_frame")
-        self.body_frame = rospy.get_param("~body_frame")
-        self.camera_frame = rospy.get_param("~camera_frame")
+        self.body_frame = rospy.get_param("~body_frame", "")
+        self.camera_frame = rospy.get_param("~camera_frame", "")
+        if self.body_frame == "" and self.camera_frame == "":
+            rospy.logwarn("Body and camera frames not specified: assuming identity!")
+        elif self.body_frame == "" or self.camera_frame == "":
+            frame_str = f"body='{self.body_frame}', camera='{self.camera_frame}'"
+            raise ValueError(f"Body/camera frames must not be empty, got {frame_str}!")
 
         self.show_plots = rospy.get_param("~show_plots")
         self.vlc_frame_period_s = rospy.get_param("~vlc_frame_period_s")
@@ -116,7 +121,12 @@ class VlcServerRos:
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
 
-        self.body_T_cam = self.get_body_T_cam_ros()
+        if self.body_frame != self.camera_frame:
+            self.body_T_cam = self.get_body_T_cam_ros()
+        else:
+            self.body_T_cam = ob.VlcPose(
+                time_ns=0, position=np.array([0, 0, 0]), rotation=np.array([0, 0, 0, 1])
+            )
 
     def get_camera_config_ros(self):
         rate = rospy.Rate(10)
