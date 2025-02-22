@@ -1,7 +1,0 @@
-fixed_frame: world
-body_frame: ground_truth/husky/base
-show_plots: true
-loop_closure_period_s: 10
-lc_recent_pose_lockout_s: 20
-lc_distance_threshold_m: 5
-lc_send_delay_s: 15
