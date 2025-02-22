@@ -110,7 +110,7 @@ setup(
         "opencv-python",
         "pyyaml",
         "pytest",
-        "scipy",
+        "scipy>=1.4.0",
     ],
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
