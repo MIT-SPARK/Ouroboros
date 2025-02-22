@@ -15,6 +15,7 @@ add_message_files(
     SparkImageMsg.msg
     VlcImageMetadataMsg.msg
     VlcImageMsg.msg
+    VlcInfoMsg.msg
 )
 
 add_service_files(
