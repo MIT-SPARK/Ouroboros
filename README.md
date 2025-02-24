@@ -61,7 +61,32 @@ of the pipeline. These plugins are also auto-discovered, meaning that it is
 possible to extend Ouroboros without needs to add any new code to the Ouroboros
 repo itself.
 
-TODO: describe how to implement a plugin and associated configuration
+We will use the Salad place recognition module as an example of how to
+implement a custom module. It is implemented
+[here](src/ouroboros_salad/salad_model.py). A plugin should be a class (here
+`SaladModel`) that takes a configuration struct as an argument in the
+constructor. It must implement a function `infer`, which will be called at the
+approriate part of the VLC pipeline. For examples of the specific interface
+that `infer` must have for each part of the pipeline, check refer to the
+"ground truth" example modules [here](src/ouroboros_gt). A plugin should also
+have a `load` method to create an instant of the class from a configuration.
+
+Next, we need to define a configuration (here `SaladModelConfig`) which
+inherits from `ouroboros.config.Config`. This should be a dataclass with any
+configuration information that you would like to set from a file. It needs to
+use the `register_config` decorator to declare that it is a plugin of type
+`place_model`, with name `Salad`, and can be constructed into a class with
+constructor `SaladModel`. The resulting plugin can be loaded from a config file
+such as [vlc\_driver\_config.yaml](examples/config/vlc_driver_config.yaml) (see
+`VlcDriverConfig.load` in
+[vlc\_server\_driver\_example.py](examples/vlc_server_driver_example.py)).
+Plugins are automatically discovered in any top-level imports from packages
+that start with `ouroboros_`, so you can use plugins with Ouroboros even
+without adding them to the Ouroboros codebase.
+
+Note that it is possible to have recursive configurations, see e.g.
+`VlcDriverConfig` in
+[vlc\_server\_driver\_example.py](examples/vlc_server_driver_example.py).
 
 # Library Building Blocks
 
@@ -88,7 +113,7 @@ When new frames should be checked and stored for VLC, you can call
 `add_and_query_frame`:
 
 ```python
-loop_closure = vlc_server.add_and_query_frame(session_id, image, epoch_ns)`
+loop_closure = vlc_server.add_and_query_frame(session_id, image, epoch_ns)
 ```
 
 For basic use-cases, this is the only function you should need. However, the
