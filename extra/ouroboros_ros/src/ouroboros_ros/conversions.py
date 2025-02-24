@@ -48,7 +48,6 @@ def vlc_image_to_msg(
     vlc_msg = VlcImageMsg()
     if vlc.image is not None and convert_image:
         vlc_msg.image = spark_image_to_msg(vlc.image)
-    vlc_msg.header = vlc_msg.image.header
     vlc_msg.metadata = vlc_image_metadata_to_msg(vlc.metadata)
     if vlc.embedding is not None and convert_embedding:
         vlc_msg.embedding = vlc.embedding.tolist()
