@@ -184,7 +184,7 @@ class VlcMultirobotServerRos(VlcServerRos):
     def client_embedding_callback(self, vlc_img_msg, robot_id):
         # Add image
         vlc_image = vlc_image_from_msg(vlc_img_msg)
-        vlc_stamp = vlc_img_msg.header.stamp.to_nsec()
+        vlc_stamp = vlc_img_msg.metadata.epoch_ns
         new_uuid = self.vlc_server.add_embedding_no_image(
             self.robot_infos[robot_id].session_id,
             vlc_image.embedding,

@@ -1,4 +1,3 @@
-std_msgs/Header header
 ouroboros_msgs/VlcImageMetadataMsg metadata
 ouroboros_msgs/SparkImageMsg image
 float32[] embedding
