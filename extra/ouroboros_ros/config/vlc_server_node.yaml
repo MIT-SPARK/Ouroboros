@@ -5,7 +5,7 @@ robot_id: 0
 config_path: $(find ouroboros_ros)/config/vlc_server_config.yaml
 
 fixed_frame: world
-hint_body_frame: ground_truth/husky/base # was camera_frame
+hint_body_frame: ground_truth/husky/base
 
 body_frame: husky/base
 camera_frame: husky/camera
