@@ -14,6 +14,15 @@ class InvertibleVectorStore:
     def __contains__(self, key):
         return key in self._uuid_to_vector
 
+    def get(self, key):
+        return self[key]
+
+    def set(self, key, newval):
+        self[key] = newval
+
+    def contains(self, key):
+        return key in self
+
     def __getitem__(self, key):
         if key not in self._uuid_to_vector:
             raise IndexError()

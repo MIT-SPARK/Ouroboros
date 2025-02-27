@@ -30,7 +30,7 @@ class VlcImageTable:
         metadata = self.metadata_store[image_uuid]
         image = self.image_store[image_uuid]
         if image_uuid in self.embedding_store:
-            embedding = self.embedding_store[image_uuid]
+            embedding = self.embedding_store.get(image_uuid)
         else:
             embedding = None
         keypoints = self.keypoints_store[image_uuid]
@@ -101,7 +101,7 @@ class VlcImageTable:
         return new_uuid
 
     def update_embedding(self, image_uuid: str, embedding):
-        self.embedding_store[image_uuid] = embedding
+        self.embedding_store.set(image_uuid, embedding)
 
     def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
         self.keypoints_store[image_uuid] = keypoints
