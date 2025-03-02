@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import message_filters
 import numpy as np
 import rospy
+import spark_config as sc
 import tf2_ros
 from pose_graph_tools_msgs.msg import PoseGraph
 from sensor_msgs.msg import CameraInfo, Image
@@ -81,7 +82,7 @@ class VlcServerRos:
         self.lc_send_delay_s = rospy.get_param("~lc_send_delay_s")
         self.robot_id = rospy.get_param("~robot_id")
 
-        plugins = ob.discover_plugins()
+        plugins = sc.discover_plugins()
         print("Found plugins: ", plugins)
         config_path = rospy.get_param("~config_path")
         server_config = ob.VlcServerConfig.load(config_path)

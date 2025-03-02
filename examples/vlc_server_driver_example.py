@@ -5,10 +5,11 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
+import spark_config as sc
+from spark_config import Config, config_field
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
-from ouroboros.config import Config, config_field
 from ouroboros.utils.plotting_utils import plt_fast_pause
 
 # Must be False in i3 if you want to save consistent-sized overhead plots for animation
@@ -91,7 +92,7 @@ def plot_lc_gt_pose(lc, image_to_pose):
     )
 
 
-plugins = ob.discover_plugins()
+plugins = sc.discover_plugins()
 print("Discovered Plugins: ")
 print(plugins)
 

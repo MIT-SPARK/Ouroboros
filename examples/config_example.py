@@ -3,7 +3,7 @@ import tempfile
 from dataclasses import dataclass
 from typing import Any
 
-from ouroboros.config import Config, config_field, register_config
+from spark_config import Config, config_field, register_config
 
 
 class ExampleTopLevel:

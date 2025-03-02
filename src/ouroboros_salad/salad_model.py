@@ -5,9 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 import torchvision.transforms as T
+from spark_config import Config, register_config
 
 import ouroboros as ob
-from ouroboros.config import Config, register_config
 
 torch.backends.cudnn.benchmark = True
 

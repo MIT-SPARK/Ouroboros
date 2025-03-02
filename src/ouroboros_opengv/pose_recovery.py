@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
+from spark_config import Config, ConfigFactory
 
-from ouroboros.config import Config, ConfigFactory
 from ouroboros.pose_recovery import FeatureGeometry, PoseRecovery, PoseRecoveryResult
 from ouroboros.vlc_db.vlc_pose import invert_pose
 from ouroboros_opengv._ouroboros_opengv import (

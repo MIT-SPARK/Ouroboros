@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
+from spark_config import Config, config_field, register_config
 
 import ouroboros as ob
-from ouroboros.config import Config, config_field, register_config
 from ouroboros.vlc_db.utils import epoch_ns_from_datetime
 
 

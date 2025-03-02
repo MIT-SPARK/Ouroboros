@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-
-from ouroboros.config import Config, register_config
+from spark_config import Config, register_config
 
 
 @register_config("camera", name="pinhole_camera")
