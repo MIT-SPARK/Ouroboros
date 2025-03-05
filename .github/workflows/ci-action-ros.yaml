@@ -19,19 +19,11 @@ jobs:
         with:
             path: src/ouroboros_repo
             submodules: recursive
-
-      #- name: Checkout Spark-Config
-      #  uses: actions/checkout@v4
-      #  with:
-      #      repository: MIT-SPARK/Spark-Config
-      #      path: './spark_config'
-      #      ref: main
       - name: Dependencies
         run: |
             sudo apt install -y libeigen3-dev pkg-config ros-noetic-cv-bridge python3-pip
             sudo pip install --upgrade pip
             sudo python3 -m pip install catkin_tools empy catkin_pkg
-            #sudo python3 -m pip install ./spark_config
       - name: Install Ouroboros
         run: pwd && ls && cd src/ouroboros_repo && pwd && pip install .
 

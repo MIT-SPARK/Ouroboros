@@ -19,12 +19,6 @@ jobs:
         with:
             path: ouroboros_repo
             submodules: recursive
-      #- name: Checkout Spark-Config
-      #  uses: actions/checkout@v4
-      #  with:
-      #      repository: MIT-SPARK/Spark-Config
-      #      path: './spark_config'
-      #      ref: main
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -35,7 +29,6 @@ jobs:
       - name: Dependencies
         run: |
             sudo apt install -y libeigen3-dev pkg-config git
-            #pip install ./spark_config
       - name: Install Ouroboros
         run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
       - name: Run test script
