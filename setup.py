@@ -111,6 +111,7 @@ setup(
         "pyyaml",
         "pytest",
         "scipy>=1.4.0",
+        "spark_config @ git+https://github.com/MIT-SPARK/Spark-Config@main",
     ],
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
