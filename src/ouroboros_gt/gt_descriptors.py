@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from spark_config import Config, register_config
 
 import ouroboros as ob
-from ouroboros.config import Config, register_config
 
 
 class GtDescriptorModel:

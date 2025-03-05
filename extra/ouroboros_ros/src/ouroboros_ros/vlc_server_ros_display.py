@@ -6,9 +6,9 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
+from spark_config import Config, register_config
 
 import ouroboros as ob
-from ouroboros.config import Config, register_config
 
 
 class VlcServerRosDisplay:

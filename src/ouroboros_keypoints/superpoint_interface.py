@@ -5,9 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 from lightglue import SuperPoint
+from spark_config import Config, register_config
 
 import ouroboros as ob
-from ouroboros.config import Config, register_config
 
 
 class SuperPointModel:
