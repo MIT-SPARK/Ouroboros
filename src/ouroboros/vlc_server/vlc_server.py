@@ -264,7 +264,7 @@ class VlcServerConfig(Config):
 
     @classmethod
     def load(cls, path: str):
-        return ob.config.Config.load(VlcServerConfig, path)
+        return Config.load(VlcServerConfig, path)
 
 
 class VlcServerOpenCvDisplay:

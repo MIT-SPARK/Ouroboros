@@ -82,7 +82,7 @@ class VlcServerRos:
         self.lc_send_delay_s = rospy.get_param("~lc_send_delay_s")
         self.robot_id = rospy.get_param("~robot_id")
 
-        plugins = sc.discover_plugins()
+        plugins = sc.discover_plugins("ouroboros_")
         print("Found plugins: ", plugins)
         config_path = rospy.get_param("~config_path")
         server_config = ob.VlcServerConfig.load(config_path)
