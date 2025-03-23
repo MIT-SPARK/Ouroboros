@@ -1,6 +1,35 @@
 [build-system]
-requires = ["setuptools", "pybind11"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ouroboros"
+description="Modules and tools for visual loop closure pipelines"
+version = "0.0.1"
+authors = [
+  {name = "Aaron Ray", email = "aaronray@mit.edu"},
+  {name = "Nathan Hughes", email = "na26933@mit.edu"},
+  {name = "Yun Chang", email = "yunchang@mit.edu"},
+]
+dependencies = [
+    "numpy",
+    "imageio",
+    "matplotlib",
+    "opencv-python",
+    "pyyaml",
+    "pytest",
+    "scipy>=1.4.0",
+    "spark_config @ git+https://github.com/MIT-SPARK/Spark-Config@main",
+]
+
+[tool.scikit-build]
+wheel.packages = [
+    "src/ouroboros",
+    "src/ouroboros_gt",
+    "src/ouroboros_keypoints",
+    "src/ouroboros_opengv",
+    "src/ouroboros_salad",
+]
 
 [tool.isort]
 profile = "black"
