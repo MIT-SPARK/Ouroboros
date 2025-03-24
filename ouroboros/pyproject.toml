@@ -22,8 +22,16 @@ dependencies = [
     "spark_config @ git+https://github.com/MIT-SPARK/Spark-Config@main",
 ]
 
+[project.optional-dependencies]
+learned = [
+    "pytorch",
+    "pytorch-lightning",
+    "pytorch-metric-learning",
+    "torchvision",
+    "git+https://github.com/cvg/LightClue.git@main",
+]
+
 [tool.scikit-build]
-cmake.source-dir = "src"
 wheel.packages = [
     "src/ouroboros",
     "src/ouroboros_gt",

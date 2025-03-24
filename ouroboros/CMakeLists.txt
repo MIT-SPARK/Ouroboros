@@ -16,7 +16,7 @@ get_target_property(EIGEN_INCLUDE_DIR Eigen3::Eigen
 
 pybind11_add_module(
   _ouroboros_opengv
-  ouroboros_opengv/_bindings.cpp
+  src/ouroboros_opengv/_bindings.cpp
   third_party/opengv/src/absolute_pose/methods.cpp
   third_party/opengv/src/absolute_pose/modules/Epnp.cpp
   third_party/opengv/src/absolute_pose/modules/gp3p/code.cpp

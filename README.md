@@ -1,22 +1,22 @@
-# Spark VLC
+ Spark VLC
 
 ## Installation
 
-First install Eigen and pkg-config
+First install Eigen
 ```bash
-apt install libeigen3-dev pkg-config
+apt install libeigen3-dev
 ```
 
 Then clone this repo, and install the `opengv` submodule with  `git submodule
 update --init --recursive`.  Then install Ouroboros by running
 
 ```bash
-pip install .
+pip install ./ouroboros
 ```
 
 You can run the tests with
 ```
-pytest --ignore=third_party --ignore=extra/ouroboros_ros
+pytest ouroboros --ignore=ouroboros/third_party
 ```
 
 Individual components of the VLC pipeline may have extra dependencies. You
@@ -31,7 +31,7 @@ the VLC Server abstraction.
 
 ## ROS Integration
 
-Ouroboros is integrated with ROS in `extras/ouroboros_ros`, which is a valid
+Ouroboros is integrated with ROS in `ouroboros_ros`, which is a valid
 ROS package. Once you have built `ouroboros_ros` in your ROS workspace, you can
 run the Ouroboros ROS node with `roslaunch ouroboros_ros
 vlc_server_node.launch`. When using the node with you datasets, you will need
@@ -63,12 +63,12 @@ repo itself.
 
 We will use the Salad place recognition module as an example of how to
 implement a custom module. It is implemented
-[here](src/ouroboros_salad/salad_model.py). A plugin should be a class (here
+[here](ouroboros/src/ouroboros_salad/salad_model.py). A plugin should be a class (here
 `SaladModel`) that takes a configuration struct as an argument in the
 constructor. It must implement a function `infer`, which will be called at the
 approriate part of the VLC pipeline. For examples of the specific interface
 that `infer` must have for each part of the pipeline, check refer to the
-"ground truth" example modules [here](src/ouroboros_gt). A plugin should also
+"ground truth" example modules [here](ouroboros/src/ouroboros_gt). A plugin should also
 have a `load` method to create an instant of the class from a configuration.
 
 Next, we need to define a configuration (here `SaladModelConfig`) which
