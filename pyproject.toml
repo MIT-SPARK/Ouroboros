@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [tool.scikit-build]
+cmake.source-dir = "src"
 wheel.packages = [
     "src/ouroboros",
     "src/ouroboros_gt",
