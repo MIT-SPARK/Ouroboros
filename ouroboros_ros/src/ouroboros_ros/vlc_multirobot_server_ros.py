@@ -2,15 +2,15 @@
 from dataclasses import dataclass
 
 import rospy
+from pose_graph_tools_msgs.msg import PoseGraph
+from sensor_msgs.msg import CameraInfo
+
+import ouroboros as ob
 from ouroboros_msgs.msg import VlcImageMsg, VlcInfoMsg
 from ouroboros_msgs.srv import (
     VlcKeypointQuery,
     VlcKeypointQueryResponse,
 )
-from pose_graph_tools_msgs.msg import PoseGraph
-from sensor_msgs.msg import CameraInfo
-
-import ouroboros as ob
 from ouroboros_ros.conversions import (
     vlc_image_from_msg,
     vlc_image_to_msg,
