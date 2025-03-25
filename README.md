@@ -2,29 +2,45 @@
 
 ## Installation
 
-First install Eigen
+First install Eigen and other dependencies:
 ```bash
 apt install libeigen3-dev
 ```
 
-Then clone this repo, and install the `opengv` submodule with  `git submodule
-update --init --recursive`.  Then install Ouroboros by running
-
+Then clone this repo:
 ```bash
+git clone git@github.com:MIT-SPARK/Ouroboros.git --recursive
+```
+
+You may want to set up a virtual environment:
+```bash
+# this can be whatever invocation of venv or virtual environment construction
+# method you like, though if you're running with ROS1 --system-site-packages
+# is the easiest way to get access to ROS.
+sudo apt install python3-venv
+python3 -m venv --system-site-packages path/to/env
+source path/to/env/bin/active
+pip install --upgrade pip  # required on Ubuntu 20.04
+```
+
+> **Note** </br>
+> If you forget to clone recursively, you can run `git submodule update --init --recursive`, though this is also done automatically during installation.
+
+Finally, install the library:
+```bash
+cd Ouroboros
 pip install ./ouroboros
 ```
 
-You can run the tests with
+Individual components of the VLC pipeline may have extra dependencies which you can install via:
+```
+pip install ./ouroboros[learned]
+```
+
+You can run unit tests with
 ```
 pytest ouroboros --ignore=ouroboros/third_party
 ```
-
-Individual components of the VLC pipeline may have extra dependencies. You
-probably want to install:
-
-1. `LightGlue` (https://github.com/cvg/LightGlue)
-2. `pytorch`, `pytorch-lightning`, `pytorch-metric-learning`, and `torchvision` via pip (needed for Salad, probably others)
-
 
 See `examples/vlc_server_driver_example.py` for the best example of how to use
 the VLC Server abstraction.

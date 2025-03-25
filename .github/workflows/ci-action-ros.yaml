@@ -43,5 +43,5 @@ jobs:
         run: |
           source devel/setup.bash
           cd src/ouroboros_repo
-          pytest extra/ouroboros_ros/tests
+          pytest ouroboros_ros/tests
       - run: echo "🍏 This job's status is ${{ job.status }}."
