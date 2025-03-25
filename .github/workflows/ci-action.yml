@@ -28,9 +28,9 @@ jobs:
         run: pip install pre-commit && cd ${{ github.workspace }}/ouroboros_repo && pre-commit run --all-files
       - name: Dependencies
         run: |
-            sudo apt install -y libeigen3-dev pkg-config git
+            sudo apt install -y libeigen3-dev git
       - name: Install Ouroboros
-        run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install .
+        run: cd ${{ github.workspace }}/ouroboros_repo && pwd && pip install ./ouroboros
       - name: Run test script
-        run: cd ${{ github.workspace }}/ouroboros_repo && pytest --ignore=third_party --ignore=extra/ouroboros_ros
+        run: cd ${{ github.workspace }}/ouroboros_repo && pytest ouroboros --ignore=ouroboros/third_party
       - run: echo "🍏 This job's status is ${{ job.status }}."
