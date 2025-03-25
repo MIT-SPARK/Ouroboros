@@ -24,11 +24,11 @@ dependencies = [
 
 [project.optional-dependencies]
 learned = [
-    "pytorch",
-    "pytorch-lightning",
-    "pytorch-metric-learning",
+    "torch",
     "torchvision",
-    "git+https://github.com/cvg/LightClue.git@main",
+    "lightning",
+    "pytorch-metric-learning",
+    "lightglue @ git+https://github.com/cvg/LightGlue.git@main",
 ]
 
 [tool.scikit-build]
