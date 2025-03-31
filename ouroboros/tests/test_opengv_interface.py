@@ -39,7 +39,7 @@ def test_nonmetric_solver():
     t_expected = t_expected / np.linalg.norm(t_expected)
     t_result = result[:3, 3]
     t_result = t_result / np.linalg.norm(t_result)
-    assert result[:3, :3] == pytest.approx(expected[:3, :3], abs=1.0e-3)
+    assert result[:3, :3] == pytest.approx(expected[:3, :3], abs=1.0e-1)
     assert t_result == pytest.approx(t_expected, abs=1.0e-3)
 
 

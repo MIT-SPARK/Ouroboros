@@ -21,12 +21,11 @@ jobs:
             submodules: recursive
       - name: Dependencies
         run: |
-            sudo apt install -y libeigen3-dev pkg-config ros-noetic-cv-bridge python3-pip
+            sudo apt install -y libeigen3-dev ros-noetic-cv-bridge python3-pip
             sudo pip install --upgrade pip
             sudo python3 -m pip install catkin_tools empy catkin_pkg
       - name: Install Ouroboros
-        run: pwd && ls && cd src/ouroboros_repo && pwd && pip install .
-
+        run: pwd && ls && cd src/ouroboros_repo && pwd && pip install ./ouroboros
       - name: Install ROS packages with rosdep
         shell: bash
         run: |
@@ -44,5 +43,5 @@ jobs:
         run: |
           source devel/setup.bash
           cd src/ouroboros_repo
-          pytest extra/ouroboros_ros/tests
+          pytest ouroboros_ros/tests
       - run: echo "🍏 This job's status is ${{ job.status }}."

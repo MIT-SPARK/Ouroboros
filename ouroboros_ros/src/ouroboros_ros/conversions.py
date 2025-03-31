@@ -2,9 +2,9 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped
-from ouroboros_msgs.msg import SparkImageMsg, VlcImageMetadataMsg, VlcImageMsg
 
 from ouroboros import SparkImage, VlcImage, VlcImageMetadata, VlcPose
+from ouroboros_msgs.msg import SparkImageMsg, VlcImageMetadataMsg, VlcImageMsg
 
 
 def vlc_image_metadata_to_msg(metadata: VlcImageMetadata) -> VlcImageMetadataMsg:

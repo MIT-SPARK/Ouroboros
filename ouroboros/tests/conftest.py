@@ -7,7 +7,7 @@ import pytest
 
 
 def _resource_dir():
-    return pathlib.Path(__file__).absolute().parent.parent / "resources"
+    return pathlib.Path(__file__).absolute().parent.parent.parent / "resources"
 
 
 @pytest.fixture()

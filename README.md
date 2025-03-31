@@ -1,37 +1,53 @@
-# Spark VLC
+ Spark VLC
 
 ## Installation
 
-First install Eigen and pkg-config
+First install Eigen and other dependencies:
 ```bash
-apt install libeigen3-dev pkg-config
+apt install libeigen3-dev
 ```
 
-Then clone this repo, and install the `opengv` submodule with  `git submodule
-update --init --recursive`.  Then install Ouroboros by running
-
+Then clone this repo:
 ```bash
-pip install .
+git clone git@github.com:MIT-SPARK/Ouroboros.git --recursive
 ```
 
-You can run the tests with
+You may want to set up a virtual environment:
+```bash
+# this can be whatever invocation of venv or virtual environment construction
+# method you like, though if you're running with ROS1 --system-site-packages
+# is the easiest way to get access to ROS.
+sudo apt install python3-venv
+python3 -m venv --system-site-packages path/to/env
+source path/to/env/bin/active
+pip install --upgrade pip  # required on Ubuntu 20.04
 ```
-pytest --ignore=third_party --ignore=extra/ouroboros_ros
+
+> **Note** </br>
+> If you forget to clone recursively, you can run `git submodule update --init --recursive`, though this is also done automatically during installation.
+
+Finally, install the library:
+```bash
+cd Ouroboros
+pip install ./ouroboros
 ```
 
-Individual components of the VLC pipeline may have extra dependencies. You
-probably want to install:
+Individual components of the VLC pipeline may have extra dependencies which you can install via:
+```
+pip install ./ouroboros[learned]
+```
 
-1. `LightGlue` (https://github.com/cvg/LightGlue)
-2. `pytorch`, `pytorch-lightning`, `pytorch-metric-learning`, and `torchvision` via pip (needed for Salad, probably others)
-
+You can run unit tests with
+```
+pytest ouroboros --ignore=ouroboros/third_party
+```
 
 See `examples/vlc_server_driver_example.py` for the best example of how to use
 the VLC Server abstraction.
 
 ## ROS Integration
 
-Ouroboros is integrated with ROS in `extras/ouroboros_ros`, which is a valid
+Ouroboros is integrated with ROS in `ouroboros_ros`, which is a valid
 ROS package. Once you have built `ouroboros_ros` in your ROS workspace, you can
 run the Ouroboros ROS node with `roslaunch ouroboros_ros
 vlc_server_node.launch`. When using the node with you datasets, you will need
@@ -63,12 +79,12 @@ repo itself.
 
 We will use the Salad place recognition module as an example of how to
 implement a custom module. It is implemented
-[here](src/ouroboros_salad/salad_model.py). A plugin should be a class (here
+[here](ouroboros/src/ouroboros_salad/salad_model.py). A plugin should be a class (here
 `SaladModel`) that takes a configuration struct as an argument in the
 constructor. It must implement a function `infer`, which will be called at the
 approriate part of the VLC pipeline. For examples of the specific interface
 that `infer` must have for each part of the pipeline, check refer to the
-"ground truth" example modules [here](src/ouroboros_gt). A plugin should also
+"ground truth" example modules [here](ouroboros/src/ouroboros_gt). A plugin should also
 have a `load` method to create an instant of the class from a configuration.
 
 Next, we need to define a configuration (here `SaladModelConfig`) which
