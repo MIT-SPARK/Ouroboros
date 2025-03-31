@@ -14,7 +14,7 @@ from sensor_msgs.msg import CameraInfo, Image
 
 import ouroboros as ob
 from ouroboros.utils.plotting_utils import plt_fast_pause
-from ouroboros_ros.utils import (
+from ouroboros_ros.servers.utils import (
     build_robot_lc_message,
     get_tf_as_pose,
     parse_camera_info,

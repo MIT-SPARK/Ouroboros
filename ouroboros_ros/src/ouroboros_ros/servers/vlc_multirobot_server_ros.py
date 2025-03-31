@@ -11,14 +11,14 @@ from ouroboros_msgs.srv import (
     VlcKeypointQuery,
     VlcKeypointQueryResponse,
 )
-from ouroboros_ros.conversions import (
+from ouroboros_ros.servers.conversions import (
     vlc_image_from_msg,
     vlc_image_to_msg,
     vlc_pose_from_msg,
     vlc_pose_to_msg,
 )
-from ouroboros_ros.utils import build_lc_message, parse_camera_info
-from ouroboros_ros.vlc_server_ros import VlcServerRos
+from ouroboros_ros.servers.utils import build_lc_message, parse_camera_info
+from ouroboros_ros.servers.vlc_server_ros import VlcServerRos
 
 
 @dataclass
