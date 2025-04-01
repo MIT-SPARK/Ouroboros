@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 
-import rospy
+import spark_config as sc
 from pose_graph_tools_msgs.msg import PoseGraph
 from sensor_msgs.msg import CameraInfo
 
-import ouroboros as ob
-from ouroboros_msgs.msg import VlcImageMsg, VlcInfoMsg
-from ouroboros_msgs.srv import (
-    VlcKeypointQuery,
-    VlcKeypointQueryResponse,
-)
-from ouroboros_ros.servers.conversions import (
+from server.conversions import (
     vlc_image_from_msg,
     vlc_image_to_msg,
     vlc_pose_from_msg,
     vlc_pose_to_msg,
 )
-from ouroboros_ros.servers.utils import build_lc_message, parse_camera_info
-from ouroboros_ros.servers.vlc_server_ros import VlcServerRos
+from server.utils import build_lc_message, parse_camera_info
+from server.vlc_server_ros import VlcServerRos
+
+import ouroboros as ob
+from ouroboros_msgs.msg import VlcImageMsg, VlcInfoMsg
+from ouroboros_msgs.srv import (
+    VlcKeypointQuery,
+    VlcKeypointQuery_Response,
+)
 
 
 @dataclass
 class RobotInfo:
     session_id: str = None
-    camera_config: ob.config.Config = None
+    camera_config: sc.Config = None
     body_T_cam: ob.VlcPose = None
 
     @classmethod
@@ -39,26 +40,24 @@ class RobotInfo:
 
 
 class VlcMultirobotServerRos(VlcServerRos):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, node_name="vlc_server_node"):
+        super().__init__(node_name)
 
         self.track_new_uuids = []
 
         # Spin up robot info server
-        self.clients = rospy.get_param("~clients")
+        self.clients = self.declare_parameter("~clients", []).value
 
         # Publish embeddings
-        self.embedding_timer = rospy.Timer(
-            rospy.Duration(5), self.embedding_timer_callback
-        )
-        self.embedding_publisher = rospy.Publisher(
-            "vlc_embedding", VlcImageMsg, queue_size=10
+        self.embedding_timer = self.create_timer(5.0, self.embedding_timer_callback)
+        self.embedding_publisher = self.create_publisher(
+            VlcImageMsg, "vlc_embedding", 10
         )
 
         # Keypoint request server
-        self.keypoint_server = rospy.Service(
-            "vlc_keypoints_request",
+        self.keypoint_server = self.create_service(
             VlcKeypointQuery,
+            "vlc_keypoints_request",
             self.process_keypoints_request,
         )
 
@@ -66,12 +65,12 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.keypoint_clients = {}
 
         # Publish info as discovery
-        self.info_timer = rospy.Timer(rospy.Duration(5), self.info_timer_callback)
-        self.info_publisher = rospy.Publisher("/vlc_info", VlcInfoMsg)
+        self.info_timer = self.create_timer(5.0, self.info_timer_callback)
+        self.info_publisher = self.create_publisher(VlcInfoMsg, "/vlc_info", 10)
 
         # Subscribe to other robots' infos as discovery
-        self.info_subscriber = rospy.Subscriber(
-            "/vlc_info", VlcInfoMsg, self.vlc_info_callback
+        self.info_subscriber = self.create_subscription(
+            "/vlc_info", VlcInfoMsg, self.vlc_info_callback, 10
         )
 
         self.robot_infos = {}
@@ -87,8 +86,8 @@ class VlcMultirobotServerRos(VlcServerRos):
         info_msg.camera_info = camera_info
         info_msg.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
 
-        info_msg.embedding_topic = rospy.resolve_name("vlc_embedding")
-        info_msg.keypoints_service = rospy.resolve_name("vlc_keypoints_request")
+        info_msg.embedding_topic = self.resolve_topic_name("vlc_embedding")
+        info_msg.keypoints_service = self.resolve_topic_name("vlc_keypoints_request")
         self.info_publisher.publish(info_msg)
 
     def vlc_info_callback(self, info_msg):
@@ -108,23 +107,25 @@ class VlcMultirobotServerRos(VlcServerRos):
         ].session_id = self.vlc_server.register_camera(
             info_msg.robot_id,
             self.robot_infos[info_msg.robot_id].camera_config,
-            rospy.Time.now().to_nsec(),
+            self.get_clock().now().to_nsec(),
         )
         self.session_robot_map[self.robot_infos[info_msg.robot_id].session_id] = (
             info_msg.robot_id
         )
         # Subscribe to embeddings
         self.embedding_subscribers.append(
-            rospy.Subscriber(
-                info_msg.embedding_topic,
+            self.create_subscription(
                 VlcImageMsg,
-                self.client_embedding_callback,
-                callback_args=info_msg.robot_id,
+                info_msg.embedding_topic,
+                lambda embedding_msg: self.client_embedding_callback(
+                    embedding_msg, info_msg.robot_id
+                ),
+                10,
             )
         )
         # Keypoint request client
-        self.keypoint_clients[info_msg.robot_id] = rospy.ServiceProxy(
-            info_msg.keypoints_service, VlcKeypointQuery
+        self.keypoint_clients[info_msg.robot_id] = self.create_client(
+            VlcKeypointQuery, info_msg.keypoints_service
         )
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
@@ -200,7 +201,9 @@ class VlcMultirobotServerRos(VlcServerRos):
         if matched_img is None:
             return
 
-        rospy.logwarn(f"Found match between robots {robot_id} and {self.robot_id}")
+        self.get_logger().warning(
+            f"Found match between robots {robot_id} and {self.robot_id}"
+        )
 
         # Request keypoints / descriptors
         response = self.keypoint_clients[robot_id](vlc_image.metadata.image_uuid)
@@ -224,14 +227,16 @@ class VlcMultirobotServerRos(VlcServerRos):
         if lc_list is None:
             return
 
-        rospy.logwarn(f"Found lc between robots {robot_id} and {self.robot_id}")
+        self.get_logger().warning(
+            f"Found lc between robots {robot_id} and {self.robot_id}"
+        )
 
         pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
-        pg.header.stamp = rospy.Time.now()
+        pg.header.stamp = self.get_clock().now()
         for lc in lc_list:
             if not lc.is_metric:
-                rospy.logwarn("Skipping non-metric loop closure.")
+                self.get_logger().warning("Skipping non-metric loop closure.")
                 continue
 
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
@@ -245,23 +250,24 @@ class VlcMultirobotServerRos(VlcServerRos):
                 pose_cov_mat,
                 self.robot_infos[robot_id].body_T_cam.as_matrix(),
                 self.body_T_cam.as_matrix(),
+                self.get_clock().now(),
             )
 
             pg.edges.append(lc_edge)
         self.loop_closure_delayed_queue.append(
-            (rospy.Time.now().to_sec() + self.lc_send_delay_s, pg)
+            (self.get_clock().now().to_sec() + self.lc_send_delay_s, pg)
         )
 
     def process_keypoints_request(self, request):
         if not self.vlc_server.has_image(request.image_uuid):
-            rospy.logwarn(f"Image ID {request.image_uuid} not found!")
-            return VlcKeypointQueryResponse()
+            self.get_logger().warning(f"Image ID {request.image_uuid} not found!")
+            return VlcKeypointQuery_Response()
 
         self.vlc_server.compute_keypoints_descriptors(
             request.image_uuid, compute_depths=True
         )
         vlc_img = self.vlc_server.get_image(request.image_uuid)
-        return VlcKeypointQueryResponse(
+        return VlcKeypointQuery_Response(
             vlc_image=vlc_image_to_msg(
                 vlc_img, convert_image=False, convert_embedding=False
             )

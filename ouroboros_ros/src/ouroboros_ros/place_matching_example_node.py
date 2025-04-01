@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import cv_bridge
-import rospy
+import rclpy
 from dynamic_reconfigure.server import Server
+from rclpy.node import Node
 from sensor_msgs.msg import Image
 
 from ouroboros import SparkImage, VlcDb
@@ -10,8 +11,9 @@ from ouroboros_ros.cfg import PlaceDescriptorDebuggingConfig
 from ouroboros_salad.salad_model import get_salad_model
 
 
-class PlaceDescriptorExample:
+class PlaceDescriptorExample(Node):
     def __init__(self):
+        super().__init__("place_matching_example")
         self.lc_lockout = 10
         self.place_match_threshold = 0.5
         self.reconfigure_server = Server(
@@ -26,7 +28,7 @@ class PlaceDescriptorExample:
         self.session_id = self.vlc_db.add_session(robot_id)
 
         # 2. subscribe to images
-        rospy.Subscriber("~image_in", Image, self.image_cb)
+        self.create_subscription(Image, "~image_in", self.image_cb, 10)
 
     def dynamic_reconfigure_cb(self, config, level):
         self.lc_lockout = config["lc_lockout"]
@@ -65,6 +67,9 @@ class PlaceDescriptorExample:
 
 
 if __name__ == "__main__":
-    rospy.init_node("place_matching_example")
+    rclpy.init()
     node = PlaceDescriptorExample()
-    rospy.spin()
+    rclpy.spin(node)
+
+    node.destroy_node()
+    rclpy.shutdown()

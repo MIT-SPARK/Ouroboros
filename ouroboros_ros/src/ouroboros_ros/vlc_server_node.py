@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-import rospy
+import rclpy
+from server.vlc_server_ros import VlcServerRos
 
-from ouroboros_ros.servers.utils import setup_ros_log_forwarding
-from ouroboros_ros.servers.vlc_server_ros import VlcServerRos
+
+def main():
+    rclpy.init()
+    vlc_server = VlcServerRos()
+    rclpy.spin(vlc_server)
+
+    vlc_server.destroy_node()
+    rclpy.shutdown()
+
 
 if __name__ == "__main__":
-    rospy.init_node("vlc_server_node")
-    setup_ros_log_forwarding()
-    node = VlcServerRos()
-    node.run()
+    main()

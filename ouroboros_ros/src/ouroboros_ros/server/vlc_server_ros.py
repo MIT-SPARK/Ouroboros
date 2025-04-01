@@ -6,19 +6,21 @@ import cv_bridge
 import matplotlib.pyplot as plt
 import message_filters
 import numpy as np
-import rospy
+import rclpy
 import spark_config as sc
 import tf2_ros
 from pose_graph_tools_msgs.msg import PoseGraph
+from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
 
-import ouroboros as ob
-from ouroboros.utils.plotting_utils import plt_fast_pause
-from ouroboros_ros.servers.utils import (
+from server.utils import (
     build_robot_lc_message,
     get_tf_as_pose,
     parse_camera_info,
 )
+
+import ouroboros as ob
+from ouroboros.utils.plotting_utils import plt_fast_pause
 
 
 def update_plot(line, pts, images_to_pose):
@@ -60,31 +62,38 @@ def get_query_and_est_match_position(lc, image_to_pose, body_T_cam):
     return query_position, est_match_position
 
 
-class VlcServerRos:
-    def __init__(self):
+class VlcServerRos(Node):
+    def __init__(self, node_name="vlc_server_node"):
+        super().__init__(node_name)
         self.tf_buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.tf_buffer)
+        self.listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.lc_pub = rospy.Publisher("~loop_closure_output", PoseGraph, queue_size=1)
+        self.lc_pub = self.create_publisher(PoseGraph, "loop_closure_output", 1)
 
-        self.fixed_frame = rospy.get_param("~fixed_frame")
-        self.hint_body_frame = rospy.get_param("~hint_body_frame")
-        self.body_frame = rospy.get_param("~body_frame", "")
-        self.camera_frame = rospy.get_param("~camera_frame", "")
+        self.fixed_frame = self.declare_parameter("fixed_frame", "map").value
+        self.hint_body_frame = self.declare_parameter(
+            "hint_body_frame", "base_link_gt"
+        ).value
+        self.body_frame = self.declare_parameter("body_frame", "").value
+        self.camera_frame = self.declare_parameter("camera_frame", "").value
         if self.body_frame == "" and self.camera_frame == "":
-            rospy.logwarn("Body and camera frames not specified: assuming identity!")
+            self.get_logger().warning(
+                "Body and camera frames not specified: assuming identity!"
+            )
         elif self.body_frame == "" or self.camera_frame == "":
             frame_str = f"body='{self.body_frame}', camera='{self.camera_frame}'"
             raise ValueError(f"Body/camera frames must not be empty, got {frame_str}!")
 
-        self.show_plots = rospy.get_param("~show_plots")
-        self.vlc_frame_period_s = rospy.get_param("~vlc_frame_period_s")
-        self.lc_send_delay_s = rospy.get_param("~lc_send_delay_s")
-        self.robot_id = rospy.get_param("~robot_id")
+        self.show_plots = self.declare_parameter("show_plots", False).value
+        self.vlc_frame_period_s = self.declare_parameter(
+            "vlc_frame_period_s", 0.5
+        ).value
+        self.lc_send_delay_s = self.declare_parameter("lc_send_delay_s", 1.0).value
+        self.robot_id = self.declare_parameter("robot_id", 0).value
 
         plugins = sc.discover_plugins("ouroboros_")
         print("Found plugins: ", plugins)
-        config_path = rospy.get_param("~config_path")
+        config_path = self.declare_parameter("config_path", "").value
         server_config = ob.VlcServerConfig.load(config_path)
         self.vlc_server = ob.VlcServer(
             server_config,
@@ -94,10 +103,10 @@ class VlcServerRos:
         self.camera_config = self.get_camera_config_ros()
         print(f"camera config: {self.camera_config}")
         self.session_id = self.vlc_server.register_camera(
-            self.robot_id, self.camera_config, rospy.Time.now().to_nsec()
+            self.robot_id, self.camera_config, self.get_clock().now().to_nsec()
         )
 
-        self.loop_rate = rospy.Rate(10)
+        self.loop_rate = self.create_rate(10)
         self.images_to_pose = {}
         self.image_pose_lock = threading.Lock()
         self.last_vlc_frame_time = None
@@ -114,8 +123,8 @@ class VlcServerRos:
         # closure until several seconds after it is detected
         self.loop_closure_delayed_queue = []
 
-        self.image_sub = message_filters.Subscriber("~image_in", Image)
-        self.depth_sub = message_filters.Subscriber("~depth_in", Image)
+        self.image_sub = message_filters.Subscriber("image_in", Image)
+        self.depth_sub = message_filters.Subscriber("depth_in", Image)
 
         self.image_depth_sub = message_filters.ApproximateTimeSynchronizer(
             [self.image_sub, self.depth_sub], 10, 0.1
@@ -129,13 +138,27 @@ class VlcServerRos:
                 time_ns=0, position=np.array([0, 0, 0]), rotation=np.array([0, 0, 0, 1])
             )
 
+    def wait_for_message(self, topic, msg_type, timeout=None):
+        """Waits for a single message from a topic asynchronously."""
+        future = rclpy.task.Future()
+
+        def callback(msg):
+            if not future.done():
+                future.set_result(msg)
+
+        sub = self.create_subscription(msg_type, topic, callback, 10)
+
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout)
+        self.destroy_subscription(sub)
+        return future.result() if future.done() else None
+
     def get_camera_config_ros(self):
-        rate = rospy.Rate(10)
-        while not rospy.is_shutdown():
+        rate = self.create_rate(10)
+        while rclpy.ok():
             try:
-                info_msg = rospy.wait_for_message("~camera_info", CameraInfo, timeout=5)
-            except rospy.ROSException:
-                rospy.logerr("Timed out waiting for camera info")
+                info_msg = self.wait_for_message("~camera_info", CameraInfo, timeout=5)
+            except rclpy.exceptions.ROSException:
+                self.get_logger().error("Timed out waiting for camera info")
                 rate.sleep()
                 continue
             pinhole = parse_camera_info(info_msg)
@@ -143,14 +166,17 @@ class VlcServerRos:
         return None
 
     def get_body_T_cam_ros(self, max_retries=10, retry_delay=0.5):
-        rate = rospy.Rate(10)
-        while not rospy.is_shutdown():
+        rate = self.create_rate(10)
+        while rclpy.ok():
             try:
                 return get_tf_as_pose(
-                    self.tf_buffer, self.body_frame, self.camera_frame, rospy.Time.now()
+                    self.tf_buffer,
+                    self.body_frame,
+                    self.camera_frame,
+                    self.get_clock().now(),
                 )
-            except rospy.ROSException:
-                rospy.logerr("Failed to get body_T_cam transform")
+            except rclpy.exceptions.ROSException:
+                self.get_logger().error("Failed to get body_T_cam transform")
                 rate.sleep()
         return None
 
@@ -165,11 +191,11 @@ class VlcServerRos:
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
             self.last_vlc_frame_time is None
-            or (rospy.Time.now() - self.last_vlc_frame_time).to_sec()
+            or (self.get_clock().now() - self.last_vlc_frame_time).to_sec()
             > self.vlc_frame_period_s
         ):
             return
-        self.last_vlc_frame_time = rospy.Time.now()
+        self.last_vlc_frame_time = self.get_clock().now()
 
         bridge = cv_bridge.CvBridge()
         try:
@@ -211,7 +237,7 @@ class VlcServerRos:
 
         pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
-        pg.header.stamp = rospy.Time.now()
+        pg.header.stamp = self.get_clock().now()
         for lc in loop_closures:
             if self.show_plots:
                 with self.image_pose_lock:
@@ -227,7 +253,7 @@ class VlcServerRos:
                     plot_lc(query_pos, match_pos, "r")
 
             if not lc.is_metric:
-                rospy.logwarn("Skipping non-metric loop closure.")
+                self.get_logger().warning("Skipping non-metric loop closure.")
                 continue
 
             from_time_ns, to_time_ns = self.vlc_server.get_lc_times(lc.metadata.lc_uuid)
@@ -243,7 +269,7 @@ class VlcServerRos:
 
             pg.edges.append(lc_edge)
         self.loop_closure_delayed_queue.append(
-            (rospy.Time.now().to_sec() + self.lc_send_delay_s, pg)
+            (self.get_clock().now().to_sec() + self.lc_send_delay_s, pg)
         )
 
     def build_pose_cov_mat(self):
@@ -259,7 +285,7 @@ class VlcServerRos:
         return pose_cov_mat
 
     def run(self):
-        while not rospy.is_shutdown():
+        while rclpy.ok():
             self.step()
             self.loop_rate.sleep()
 
@@ -277,7 +303,7 @@ class VlcServerRos:
         # before it will be accepted by Hydra.
         while len(self.loop_closure_delayed_queue) > 0:
             send_time, pg = self.loop_closure_delayed_queue[0]
-            if rospy.Time.now().to_sec() >= send_time:
+            if self.get_clock().now().to_sec() >= send_time:
                 self.lc_pub.publish(pg)
                 self.loop_closure_delayed_queue = self.loop_closure_delayed_queue[1:]
             else:

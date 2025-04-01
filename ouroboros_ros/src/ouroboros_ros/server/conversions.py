@@ -1,5 +1,5 @@
 import numpy as np
-import rospy
+import rclpy
 from cv_bridge import CvBridge
 from geometry_msgs.msg import PoseStamped
 
@@ -25,7 +25,7 @@ def spark_image_to_msg(image: SparkImage) -> SparkImageMsg:
 
 def vlc_pose_to_msg(pose: VlcPose) -> PoseStamped:
     pose_msg = PoseStamped()
-    pose_msg.header.stamp = rospy.Time(nsecs=pose.time_ns)
+    pose_msg.header.stamp = rclpy.time.Time(nanoseconds=pose.time_ns)
     pose_msg.pose.position.x = pose.position[0]
     pose_msg.pose.position.y = pose.position[1]
     pose_msg.pose.position.z = pose.position[2]
