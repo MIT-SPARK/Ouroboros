@@ -17,6 +17,7 @@ from server.utils import (
     build_robot_lc_message,
     get_tf_as_pose,
     parse_camera_info,
+    parse_tf_pose,
 )
 
 import ouroboros as ob
@@ -92,7 +93,7 @@ class VlcServerRos(Node):
         self.robot_id = self.declare_parameter("robot_id", 0).value
 
         plugins = sc.discover_plugins("ouroboros_")
-        print("Found plugins: ", plugins)
+        self.get_logger().info(f"Found plugins: {plugins}")
         config_path = self.declare_parameter("config_path", "").value
         server_config = ob.VlcServerConfig.load(config_path)
         self.vlc_server = ob.VlcServer(
@@ -100,10 +101,21 @@ class VlcServerRos(Node):
             robot_id=self.robot_id,
         )
 
+        # Get camera intrinsics
         self.camera_config = self.get_camera_config_ros()
-        print(f"camera config: {self.camera_config}")
+        self.get_logger().info(f"camera config: {self.camera_config}")
+
+        # Get camera extrinsics
+        if self.body_frame != self.camera_frame:
+            self.body_T_cam = self.get_body_T_cam_ros()
+        else:
+            self.body_T_cam = ob.VlcPose(
+                time_ns=0, position=np.array([0, 0, 0]), rotation=np.array([0, 0, 0, 1])
+            )
+        self.get_logger().info(f"body_T_cam: {self.body_T_cam}")
+
         self.session_id = self.vlc_server.register_camera(
-            self.robot_id, self.camera_config, self.get_clock().now().to_nsec()
+            self.robot_id, self.camera_config, self.get_clock().now().nanoseconds
         )
 
         self.loop_rate = self.create_rate(10)
@@ -123,20 +135,13 @@ class VlcServerRos(Node):
         # closure until several seconds after it is detected
         self.loop_closure_delayed_queue = []
 
-        self.image_sub = message_filters.Subscriber("image_in", Image)
-        self.depth_sub = message_filters.Subscriber("depth_in", Image)
+        self.image_sub = message_filters.Subscriber(self, Image, "image_in")
+        self.depth_sub = message_filters.Subscriber(self, Image, "depth_in")
 
         self.image_depth_sub = message_filters.ApproximateTimeSynchronizer(
-            [self.image_sub, self.depth_sub], 10, 0.1
+            [self.image_sub, self.depth_sub], queue_size=10, slop=0.1
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
-
-        if self.body_frame != self.camera_frame:
-            self.body_T_cam = self.get_body_T_cam_ros()
-        else:
-            self.body_T_cam = ob.VlcPose(
-                time_ns=0, position=np.array([0, 0, 0]), rotation=np.array([0, 0, 0, 1])
-            )
 
     def wait_for_message(self, topic, msg_type, timeout=None):
         """Waits for a single message from a topic asynchronously."""
@@ -152,32 +157,46 @@ class VlcServerRos(Node):
         self.destroy_subscription(sub)
         return future.result() if future.done() else None
 
+    def wait_for_transform(self, target_frame, source_frame, timeout=None):
+        future = rclpy.task.Future()
+
+        def check_transform():
+            try:
+                trans = self.tf_buffer.lookup_transform(
+                    target_frame, source_frame, self.get_clock().now()
+                )
+                if not future.done():
+                    future.set_result(trans)
+            except Exception as e:
+                self.get_logger().warn(f"Transform not available: {str(e)}")
+
+        timer = self.create_timer(0.1, check_transform)
+
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout)
+        timer.cancel()
+
+        return future.result() if future.done() else None
+
     def get_camera_config_ros(self):
         rate = self.create_rate(10)
         while rclpy.ok():
-            try:
-                info_msg = self.wait_for_message("~camera_info", CameraInfo, timeout=5)
-            except rclpy.exceptions.ROSException:
-                self.get_logger().error("Timed out waiting for camera info")
-                rate.sleep()
-                continue
-            pinhole = parse_camera_info(info_msg)
-            return pinhole
+            info_msg = self.wait_for_message("camera_info", CameraInfo, timeout=5)
+            if info_msg is not None:
+                pinhole = parse_camera_info(info_msg)
+                return pinhole
+            self.get_logger().error("Timed out waiting for camera info")
+            rate.sleep()
         return None
 
-    def get_body_T_cam_ros(self, max_retries=10, retry_delay=0.5):
+    def get_body_T_cam_ros(self):
         rate = self.create_rate(10)
         while rclpy.ok():
-            try:
-                return get_tf_as_pose(
-                    self.tf_buffer,
-                    self.body_frame,
-                    self.camera_frame,
-                    self.get_clock().now(),
-                )
-            except rclpy.exceptions.ROSException:
-                self.get_logger().error("Failed to get body_T_cam transform")
-                rate.sleep()
+            tf = self.wait_for_transform(self.body_frame, self.camera_frame)
+            if tf is not None:
+                tf_pose = parse_tf_pose(tf)
+                return tf_pose
+            self.get_logger().error("Failed to get body_T_cam transform")
+            rate.sleep()
         return None
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
@@ -196,6 +215,7 @@ class VlcServerRos(Node):
         ):
             return
         self.last_vlc_frame_time = self.get_clock().now()
+        msg_time = rclpy.time.Time().from_msg(img_msg.header.stamp)
 
         bridge = cv_bridge.CvBridge()
         try:
@@ -217,7 +237,7 @@ class VlcServerRos(Node):
         # inform the place recognition, keypoint detection, keypoint
         # descriptor, and pose recovery methods.
         hint_pose = get_tf_as_pose(
-            self.tf_buffer, self.fixed_frame, self.hint_body_frame, img_msg.header.stamp
+            self.tf_buffer, self.fixed_frame, self.hint_body_frame, msg_time
         )
 
         if hint_pose is None:
@@ -226,7 +246,7 @@ class VlcServerRos(Node):
 
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
         image_uuid, loop_closures = self.process_new_frame(
-            spark_image, img_msg.header.stamp.to_nsec(), hint_pose
+            spark_image, msg_time.nanoseconds, hint_pose
         )
 
         with self.image_pose_lock:
@@ -237,7 +257,7 @@ class VlcServerRos(Node):
 
         pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
-        pg.header.stamp = self.get_clock().now()
+        pg.header.stamp = self.get_clock().now().to_msg()
         for lc in loop_closures:
             if self.show_plots:
                 with self.image_pose_lock:

@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import rclpy
 import tf2_ros
@@ -62,45 +64,49 @@ def build_lc_message(
     return lc_edge
 
 
+def parse_tf_pose(tf):
+    current_pos = np.array(
+        [
+            tf.transform.translation.x,
+            tf.transform.translation.y,
+            tf.transform.translation.z,
+        ]
+    )
+
+    current_rot = np.array(
+        [
+            tf.transform.rotation.x,
+            tf.transform.rotation.y,
+            tf.transform.rotation.z,
+            tf.transform.rotation.w,
+        ]
+    )
+
+    time_ns = rclpy.time.Time().from_msg(tf.header.stamp).nanoseconds
+    vlc_pose = ob.VlcPose(time_ns=time_ns, position=current_pos, rotation=current_rot)
+    return vlc_pose
+
+
 def get_tf_as_pose(tf_buffer, fixed_frame, body_frame, time, timeout=1.0):
     try:
         trans = tf_buffer.lookup_transform(
-            fixed_frame, body_frame, time, rclpy.duration.Duration(timeout)
+            fixed_frame, body_frame, time, rclpy.duration.Duration(seconds=timeout)
         )
     except (
         tf2_ros.LookupException,
         tf2_ros.ConnectivityException,
         tf2_ros.ExtrapolationException,
     ) as e:
-        rclpy.logwarn(
+        logging.error(
             " Could not transform %s from %s: %s ", fixed_frame, body_frame, str(e)
         )
         return
 
-    current_pos = np.array(
-        [
-            trans.transform.translation.x,
-            trans.transform.translation.y,
-            trans.transform.translation.z,
-        ]
-    )
-
-    current_rot = np.array(
-        [
-            trans.transform.rotation.x,
-            trans.transform.rotation.y,
-            trans.transform.rotation.z,
-            trans.transform.rotation.w,
-        ]
-    )
-
-    time_ns = trans.header.stamp.to_nsec()
-    vlc_pose = ob.VlcPose(time_ns=time_ns, position=current_pos, rotation=current_rot)
-    return vlc_pose
+    return parse_tf_pose(trans)
 
 
 def parse_camera_info(info_msg):
-    K = np.array(info_msg.K).reshape((3, 3))
+    K = np.array(info_msg.k).reshape((3, 3))
     fx = K[0, 0]
     fy = K[1, 1]
     cx = K[0, 2]
