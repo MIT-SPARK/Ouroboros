@@ -12,7 +12,7 @@ authors = [
   {name = "Yun Chang", email = "yunchang@mit.edu"},
 ]
 dependencies = [
-    "numpy",
+    "numpy<2.0.0",
     "imageio",
     "matplotlib",
     "opencv-python",
