@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 
+import rclpy
 import spark_config as sc
 from pose_graph_tools_msgs.msg import PoseGraph
 from sensor_msgs.msg import CameraInfo
@@ -16,10 +17,7 @@ from server.vlc_server_ros import VlcServerRos
 
 import ouroboros as ob
 from ouroboros_msgs.msg import VlcImageMsg, VlcInfoMsg
-from ouroboros_msgs.srv import (
-    VlcKeypointQuery,
-    VlcKeypointQuery_Response,
-)
+from ouroboros_msgs.srv import VlcKeypointQuery
 
 
 @dataclass
@@ -104,6 +102,9 @@ class VlcMultirobotServerRos(VlcServerRos):
             # Already initialized
             return
 
+        self.get_logger().info(
+            f"Established connection with client with robot id {info_msg.robot_id}"
+        )
         self.robot_infos[info_msg.robot_id] = RobotInfo.from_info_msg(info_msg)
         # Assign session_id
         self.robot_infos[
@@ -127,9 +128,22 @@ class VlcMultirobotServerRos(VlcServerRos):
                 10,
             )
         )
+        self.get_logger().info(
+            f"Starting subscription to embedding topic: {info_msg.embedding_topic}"
+        )
+
         # Keypoint request client
         self.keypoint_clients[info_msg.robot_id] = self.create_client(
             VlcKeypointQuery, info_msg.keypoints_service
+        )
+        while not self.keypoint_clients[info_msg.robot_id].wait_for_service(
+            timeout_sec=1.0
+        ):
+            self.get_logger().warning(
+                f"Service {info_msg.keypoints_service} not available, trying again..."
+            )
+        self.get_logger().info(
+            f"Starting service client to server: {info_msg.keypoints_service}"
         )
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
@@ -155,8 +169,11 @@ class VlcMultirobotServerRos(VlcServerRos):
             remapped_match_uuid = self.uuid_map[match_uuid]
             # Request keypoint and descriptors for match
             robot_id = self.session_robot_map[image_match.metadata.session_id]
-            response = self.keypoint_clients[robot_id](remapped_match_uuid)
-            vlc_response = vlc_image_from_msg(response.vlc_image)
+            keypoints_request = VlcKeypointQuery.Request()
+            keypoints_request.image_uuid = remapped_match_uuid
+            future = self.keypoint_clients[robot_id].call_async(keypoints_request)
+            rclpy.spin_until_future_complete(self, future)
+            vlc_response = vlc_image_from_msg(future.result().vlc_image)
             self.vlc_server.update_keypoints_decriptors(
                 match_uuid, vlc_response.keypoints, vlc_response.descriptors
             )
@@ -210,8 +227,11 @@ class VlcMultirobotServerRos(VlcServerRos):
         )
 
         # Request keypoints / descriptors
-        response = self.keypoint_clients[robot_id](vlc_image.metadata.image_uuid)
-        vlc_response = vlc_image_from_msg(response.vlc_image)
+        keypoints_request = VlcKeypointQuery.Request()
+        keypoints_request.image_uuid = vlc_image.metadata.image_uuid
+        future = self.keypoint_clients[robot_id].call_async(keypoints_request)
+        rclpy.spin_until_future_complete(self, future)
+        vlc_response = vlc_image_from_msg(future.result().vlc_image)
         self.vlc_server.update_keypoints_decriptors(
             new_uuid, vlc_response.keypoints, vlc_response.descriptors
         )
@@ -262,17 +282,16 @@ class VlcMultirobotServerRos(VlcServerRos):
             (self.get_clock().now().nanoseconds * 1.0e-9 + self.lc_send_delay_s, pg)
         )
 
-    def process_keypoints_request(self, request):
+    def process_keypoints_request(self, request, response):
         if not self.vlc_server.has_image(request.image_uuid):
             self.get_logger().warning(f"Image ID {request.image_uuid} not found!")
-            return VlcKeypointQuery_Response()
+            return response
 
         self.vlc_server.compute_keypoints_descriptors(
             request.image_uuid, compute_depths=True
         )
         vlc_img = self.vlc_server.get_image(request.image_uuid)
-        return VlcKeypointQuery_Response(
-            vlc_image=vlc_image_to_msg(
-                vlc_img, convert_image=False, convert_embedding=False
-            )
+        response.vlc_image = vlc_image_to_msg(
+            vlc_img, convert_image=False, convert_embedding=False
         )
+        return response

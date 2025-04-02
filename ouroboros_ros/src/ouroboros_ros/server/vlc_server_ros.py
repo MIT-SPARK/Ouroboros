@@ -244,7 +244,7 @@ class VlcServerRos(Node):
         )
 
         if hint_pose is None:
-            print("Cannot get current pose, skipping frame!")
+            self.get_logger().warning("Cannot get current pose, skipping frame!")
             return
 
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
