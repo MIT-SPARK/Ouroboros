@@ -25,7 +25,7 @@ launch:
         - {name: camera_frame, value: $(var camera_frame)}
         - {name: config_path, value: $(var vlc_config_path)}
       remap:
-        - {from: image_in, to: /tesse/left_cam/rgb/mimage_raw}
+        - {from: image_in, to: /tesse/left_cam/rgb/image_raw}
         - {from: camera_info, to: /tesse/left_cam/camera_info}
         - {from: depth_in, to: /tesse/depth_cam/mono/image_raw}
 

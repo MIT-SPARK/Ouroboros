@@ -118,7 +118,6 @@ class VlcServerRos(Node):
             self.robot_id, self.camera_config, self.get_clock().now().nanoseconds
         )
 
-        self.loop_rate = self.create_rate(10)
         self.images_to_pose = {}
         self.image_pose_lock = threading.Lock()
         self.last_vlc_frame_time = None
@@ -142,6 +141,10 @@ class VlcServerRos(Node):
             [self.image_sub, self.depth_sub], queue_size=10, slop=0.1
         )
         self.image_depth_sub.registerCallback(self.image_depth_callback)
+
+        self.publish_timer = self.create_timer(0.1, self.step)
+
+        self.get_logger().info("Initialized VLC Server ROS Node")
 
     def wait_for_message(self, topic, msg_type, timeout=None):
         """Waits for a single message from a topic asynchronously."""
@@ -210,8 +213,8 @@ class VlcServerRos(Node):
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
             self.last_vlc_frame_time is None
-            or (self.get_clock().now() - self.last_vlc_frame_time).to_sec()
-            > self.vlc_frame_period_s
+            or (self.get_clock().now() - self.last_vlc_frame_time).nanoseconds
+            > self.vlc_frame_period_s * 1.0e9
         ):
             return
         self.last_vlc_frame_time = self.get_clock().now()
@@ -285,11 +288,12 @@ class VlcServerRos(Node):
                 lc.f_T_t,
                 pose_cov_mat,
                 self.body_T_cam.as_matrix(),
+                self.get_clock().now(),
             )
 
             pg.edges.append(lc_edge)
         self.loop_closure_delayed_queue.append(
-            (self.get_clock().now().to_sec() + self.lc_send_delay_s, pg)
+            (self.get_clock().now().nanoseconds * 1.0e-9 + self.lc_send_delay_s, pg)
         )
 
     def build_pose_cov_mat(self):
@@ -303,11 +307,6 @@ class VlcServerRos(Node):
         pose_cov_mat[4, 4] = rot_cov
         pose_cov_mat[5, 5] = rot_cov
         return pose_cov_mat
-
-    def run(self):
-        while rclpy.ok():
-            self.step()
-            self.loop_rate.sleep()
 
     def step(self):
         if self.show_plots:
@@ -323,7 +322,7 @@ class VlcServerRos(Node):
         # before it will be accepted by Hydra.
         while len(self.loop_closure_delayed_queue) > 0:
             send_time, pg = self.loop_closure_delayed_queue[0]
-            if self.get_clock().now().to_sec() >= send_time:
+            if self.get_clock().now().nanoseconds >= send_time * 1.0e9:
                 self.lc_pub.publish(pg)
                 self.loop_closure_delayed_queue = self.loop_closure_delayed_queue[1:]
             else:

@@ -16,6 +16,7 @@ def build_robot_lc_message(
     from_T_to,
     pose_cov,
     body_T_cam,
+    time,
 ):
     return build_lc_message(
         key_from_ns,
@@ -26,6 +27,7 @@ def build_robot_lc_message(
         pose_cov,
         body_T_cam,
         body_T_cam,
+        time,
     )
 
 
@@ -45,7 +47,7 @@ def build_lc_message(
     relative_orientation = R.from_matrix(bodyfrom_T_bodyto[:3, :3])
 
     lc_edge = PoseGraphEdge()
-    lc_edge.header.stamp = time
+    lc_edge.header.stamp = time.to_msg()
     lc_edge.key_from = key_from_ns
     lc_edge.key_to = key_to_ns
     lc_edge.robot_from = robot_from
