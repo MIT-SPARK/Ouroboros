@@ -31,7 +31,7 @@ class RobotInfo:
     @classmethod
     def from_info_msg(cls, resp: VlcInfoMsg):
         camera_config = parse_camera_info(resp.camera_info)
-        body_T_cam = vlc_pose_from_msg(resp.body_T_cam)
+        body_T_cam = vlc_pose_from_msg(resp.body_tf_cam)
         return cls(
             session_id=None,
             camera_config=camera_config,
@@ -46,7 +46,7 @@ class VlcMultirobotServerRos(VlcServerRos):
         self.track_new_uuids = []
 
         # Spin up robot info server
-        self.clients = self.declare_parameter("~clients", []).value
+        self.vlc_clients = self.declare_parameter("clients", [0]).value
 
         # Publish embeddings
         self.embedding_timer = self.create_timer(5.0, self.embedding_timer_callback)
@@ -70,21 +70,25 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         # Subscribe to other robots' infos as discovery
         self.info_subscriber = self.create_subscription(
-            "/vlc_info", VlcInfoMsg, self.vlc_info_callback, 10
+            VlcInfoMsg, "/vlc_info", self.vlc_info_callback, 10
         )
 
         self.robot_infos = {}
         self.uuid_map = {}
         self.session_robot_map = {}
 
-    def info_timer_callback(self, event):
+        self.get_logger().info(
+            f"Initialized VLC server for Robot ID {self.robot_id} with clients {self.vlc_clients}"
+        )
+
+    def info_timer_callback(self):
         # NOTE(Yun) maybe should terminate this? But there's a case where a new server shows up
         info_msg = VlcInfoMsg()
         info_msg.robot_id = self.robot_id
         camera_info = CameraInfo()
-        camera_info.K = self.camera_config.K.flatten()
+        camera_info.k = self.camera_config.K.flatten()
         info_msg.camera_info = camera_info
-        info_msg.body_T_cam = vlc_pose_to_msg(self.body_T_cam)
+        info_msg.body_tf_cam = vlc_pose_to_msg(self.body_T_cam)
 
         info_msg.embedding_topic = self.resolve_topic_name("vlc_embedding")
         info_msg.keypoints_service = self.resolve_topic_name("vlc_keypoints_request")
@@ -92,7 +96,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
     def vlc_info_callback(self, info_msg):
         # Note(Yun) alternatively define server(s) in msg
-        if info_msg.robot_id not in self.clients:
+        if self.vlc_clients is None or info_msg.robot_id not in self.vlc_clients:
             # Not handling this robot
             return
 
@@ -107,7 +111,7 @@ class VlcMultirobotServerRos(VlcServerRos):
         ].session_id = self.vlc_server.register_camera(
             info_msg.robot_id,
             self.robot_infos[info_msg.robot_id].camera_config,
-            self.get_clock().now().to_nsec(),
+            self.get_clock().now().nanoseconds,
         )
         self.session_robot_map[self.robot_infos[info_msg.robot_id].session_id] = (
             info_msg.robot_id
@@ -174,7 +178,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         return new_uuid, lc_list
 
-    def embedding_timer_callback(self, event):
+    def embedding_timer_callback(self):
         while len(self.track_new_uuids) > 0:
             new_uuid = self.track_new_uuids.pop(0)
             vlc_img_msg = vlc_image_to_msg(
@@ -233,7 +237,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
         pose_cov_mat = self.build_pose_cov_mat()
         pg = PoseGraph()
-        pg.header.stamp = self.get_clock().now()
+        pg.header.stamp = self.get_clock().now().to_msg()
         for lc in lc_list:
             if not lc.is_metric:
                 self.get_logger().warning("Skipping non-metric loop closure.")
@@ -255,7 +259,7 @@ class VlcMultirobotServerRos(VlcServerRos):
 
             pg.edges.append(lc_edge)
         self.loop_closure_delayed_queue.append(
-            (self.get_clock().now().to_sec() + self.lc_send_delay_s, pg)
+            (self.get_clock().now().nanoseconds * 1.0e-9 + self.lc_send_delay_s, pg)
         )
 
     def process_keypoints_request(self, request):

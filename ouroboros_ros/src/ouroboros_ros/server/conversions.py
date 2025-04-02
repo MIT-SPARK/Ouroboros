@@ -25,7 +25,7 @@ def spark_image_to_msg(image: SparkImage) -> SparkImageMsg:
 
 def vlc_pose_to_msg(pose: VlcPose) -> PoseStamped:
     pose_msg = PoseStamped()
-    pose_msg.header.stamp = rclpy.time.Time(nanoseconds=pose.time_ns)
+    pose_msg.header.stamp = rclpy.time.Time(nanoseconds=pose.time_ns).to_msg()
     pose_msg.pose.position.x = pose.position[0]
     pose_msg.pose.position.y = pose.position[1]
     pose_msg.pose.position.z = pose.position[2]
@@ -96,7 +96,7 @@ def vlc_pose_from_msg(pose_msg: PoseStamped) -> VlcPose:
     pos = pose_msg.pose.position
     quat = pose_msg.pose.orientation
     return VlcPose(
-        time_ns=pose_msg.header.stamp.to_nsec(),
+        time_ns=rclpy.time.Time().from_msg(pose_msg.header.stamp).nanoseconds,
         position=np.array([pos.x, pos.y, pos.z]),
         rotation=np.array([quat.x, quat.y, quat.z, quat.w]),
     )

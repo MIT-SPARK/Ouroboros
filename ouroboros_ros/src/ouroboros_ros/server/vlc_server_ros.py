@@ -194,7 +194,7 @@ class VlcServerRos(Node):
     def get_body_T_cam_ros(self):
         rate = self.create_rate(10)
         while rclpy.ok():
-            tf = self.wait_for_transform(self.body_frame, self.camera_frame)
+            tf = self.wait_for_transform(self.body_frame, self.camera_frame, timeout=5)
             if tf is not None:
                 tf_pose = parse_tf_pose(tf)
                 return tf_pose
