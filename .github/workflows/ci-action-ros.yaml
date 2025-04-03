@@ -22,7 +22,7 @@ jobs:
             submodules: recursive
       - name: Dependencies
         run: |
-            sudo apt install -y python3-colcon-common-extensions python3-pip ros-jazzy-cv-bridge libeigen3-dev
+            sudo apt install -y python3-colcon-common-extensions python3-pip libeigen3-dev
             sudo pip install --upgrade pip
       - name: Install Ouroboros
         run: pwd && ls && cd src/ouroboros_repo && pwd && pip install ./ouroboros
