@@ -1,9 +1,10 @@
 import logging
 
 import numpy as np
-import rclpy
 import tf2_ros
 from pose_graph_tools_msgs.msg import PoseGraphEdge
+from rclpy.duration import Duration
+from rclpy.time import Time
 from scipy.spatial.transform import Rotation as R
 
 import ouroboros as ob
@@ -84,7 +85,7 @@ def parse_tf_pose(tf):
         ]
     )
 
-    time_ns = rclpy.time.Time().from_msg(tf.header.stamp).nanoseconds
+    time_ns = Time().from_msg(tf.header.stamp).nanoseconds
     vlc_pose = ob.VlcPose(time_ns=time_ns, position=current_pos, rotation=current_rot)
     return vlc_pose
 
@@ -92,7 +93,7 @@ def parse_tf_pose(tf):
 def get_tf_as_pose(tf_buffer, fixed_frame, body_frame, time, timeout=1.0):
     try:
         trans = tf_buffer.lookup_transform(
-            fixed_frame, body_frame, time, rclpy.duration.Duration(seconds=timeout)
+            fixed_frame, body_frame, time, Duration(seconds=timeout)
         )
     except (
         tf2_ros.LookupException,

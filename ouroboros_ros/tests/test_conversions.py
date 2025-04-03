@@ -1,12 +1,11 @@
-"""Test pose utilities."""
+"""Test ROS conversions."""
 
 from datetime import datetime
 
 import numpy as np
 import numpy.testing as npt
-
-import ouroboros as ob
-from ouroboros_ros.conversions import (
+import setup_tests
+from server.conversions import (
     spark_image_from_msg,
     spark_image_to_msg,
     vlc_image_from_msg,
@@ -16,6 +15,11 @@ from ouroboros_ros.conversions import (
     vlc_pose_from_msg,
     vlc_pose_to_msg,
 )
+
+import ouroboros as ob
+
+assert setup_tests
+# TODO(Yun) figure out cleaner way to get around ROS2 and importing
 
 
 def test_vlc_metadata_conversion():
