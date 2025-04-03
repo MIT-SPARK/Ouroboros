@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import threading
+import time
 
 import cv_bridge
 import matplotlib.pyplot as plt
@@ -144,6 +145,16 @@ class VlcServerRos(Node):
 
         self.publish_timer = self.create_timer(0.1, self.step)
 
+        self.compute_lc_timer = self.create_timer(1.0, self.compute_lcs)
+
+        self.candidates = []
+        self.candidates_lock = threading.Lock()
+
+        # Compute descriptors thread
+        self.shutdown = False
+        self.thread = threading.Thread(target=self.compute_keypoints_spin)
+        self.thread.start()
+
         self.get_logger().info("Initialized VLC Server ROS Node")
 
     def wait_for_message(self, topic, msg_type, timeout=None):
@@ -203,12 +214,27 @@ class VlcServerRos(Node):
         return None
 
     def process_new_frame(self, image, stamp_ns, hint_pose):
-        return self.vlc_server.add_and_query_frame(
+        # Need a different one due to sometimes needing to request keypoints
+        new_uuid = self.vlc_server.add_frame(
             self.session_id,
             image,
             stamp_ns,
             pose_hint=hint_pose,
         )
+
+        with self.image_pose_lock:
+            self.images_to_pose[new_uuid] = hint_pose
+
+        # Find match using the embeddings.
+        image_match = self.vlc_server.find_match(new_uuid, stamp_ns)
+
+        if image_match is None:
+            return new_uuid
+
+        with self.candidates_lock:
+            self.candidates.append((new_uuid, image_match.metadata.image_uuid))
+
+        return new_uuid
 
     def image_depth_callback(self, img_msg, depth_msg):
         if not (
@@ -248,14 +274,27 @@ class VlcServerRos(Node):
             return
 
         spark_image = ob.SparkImage(rgb=color_image, depth=depth_image)
-        image_uuid, loop_closures = self.process_new_frame(
-            spark_image, msg_time.nanoseconds, hint_pose
-        )
+        self.process_new_frame(spark_image, msg_time.nanoseconds, hint_pose)
 
-        with self.image_pose_lock:
-            self.images_to_pose[image_uuid] = hint_pose
+    def compute_keypoints(self):
+        with self.candidates_lock:
+            for query_uuid, match_uuid in self.candidates:
+                self.vlc_server.compute_keypoints_descriptors(
+                    match_uuid, compute_depths=True
+                )
 
-        if loop_closures is None:
+                # Compute self keypoints and descriptors
+                self.vlc_server.compute_keypoints_descriptors(
+                    query_uuid, compute_depths=True
+                )
+
+    def compute_keypoints_spin(self):
+        while not self.shutdown:
+            self.compute_keypoints()
+            time.sleep(0.1)
+
+    def publish_lcs(self, loop_closures):
+        if len(loop_closures) == 0:
             return
 
         pose_cov_mat = self.build_pose_cov_mat()
@@ -296,6 +335,34 @@ class VlcServerRos(Node):
             (self.get_clock().now().nanoseconds * 1.0e-9 + self.lc_send_delay_s, pg)
         )
 
+    def compute_lcs(self):
+        loop_closures = []
+        with self.candidates_lock:
+            unprocessed_candidates = []
+            for query_uuid, match_uuid in self.candidates:
+                query_image = self.vlc_server.get_image(query_uuid)
+                match_image = self.vlc_server.get_image(match_uuid)
+
+                if query_image.keypoints is None or match_image.keypoints is None:
+                    unprocessed_candidates.append((query_uuid, match_uuid))
+                    continue
+
+                lc_list = self.vlc_server.compute_loop_closure_pose(
+                    self.session_id,
+                    query_uuid,
+                    match_uuid,
+                    self.get_clock().now().nanoseconds,
+                )
+
+                if lc_list is None:
+                    continue
+
+                loop_closures.extend(lc_list)
+
+            self.candidates = unprocessed_candidates
+
+        self.publish_lcs(loop_closures)
+
     def build_pose_cov_mat(self):
         pose_cov_mat = np.zeros((6, 6))
         pos_cov = 0.1
@@ -327,3 +394,8 @@ class VlcServerRos(Node):
                 self.loop_closure_delayed_queue = self.loop_closure_delayed_queue[1:]
             else:
                 break
+
+    def destroy_node(self):
+        self.shutdown = True
+        self.thread.join()
+        super().destroy_node()

@@ -242,6 +242,12 @@ class VlcServer:
         to_time_ns = self.vlc_db.get_image(lc.to_image_uuid).metadata.epoch_ns
         return from_time_ns, to_time_ns
 
+    def get_lc_sessions(self, lc_uuid: str) -> Tuple[str, str]:
+        lc = self.vlc_db.get_lc(lc_uuid)
+        from_session = self.vlc_db.get_image(lc.from_image_uuid).metadata.session_id
+        to_session = self.vlc_db.get_image(lc.to_image_uuid).metadata.session_id
+        return from_session, to_session
+
     def has_image(self, image_uuid: str) -> bool:
         return self.vlc_db.has_image(image_uuid)
 
