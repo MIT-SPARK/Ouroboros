@@ -24,7 +24,7 @@ jobs:
         run: |
             sudo apt install -y python3-colcon-common-extensions python3-pip ros-jazzy-cv-bridge libeigen3-dev
       - name: Install Ouroboros
-        run: pwd && ls && cd src/ouroboros_repo && pwd && python3 -m pip install --break-system-packages install ./ouroboros
+        run: pwd && ls && cd src/ouroboros_repo && pwd && python3 -m pip install --break-system-packages ./ouroboros
       - name: Install ROS packages with rosdep
         shell: bash
         run: |
