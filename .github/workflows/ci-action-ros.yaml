@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
-          colcon build --continue-on-error
+          colcon build
       - name: Run test script
         shell: bash
         run: |
