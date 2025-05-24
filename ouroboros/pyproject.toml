@@ -12,6 +12,7 @@ authors = [
   {name = "Yun Chang", email = "yunchang@mit.edu"},
 ]
 dependencies = [
+    "click",
     "numpy<2.0.0",
     "imageio",
     "matplotlib",
@@ -20,6 +21,7 @@ dependencies = [
     "pytest",
     "scipy>=1.4.0",
     "spark_config @ git+https://github.com/MIT-SPARK/Spark-Config@main",
+    "spark_dataset_interfaces @ git+https://github.com/MIT-SPARK/spark_dataset_interfaces@main",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,11 @@
+place_method:
+  type: Salad
+  embedding_size: 8448
+  model_source: torchhub
+  model_variant: serizba/salad
+  weight_source: dinov2_salad
+keypoint_method:
+  type: SuperPoint
+  max_keypoints: 1024
+descriptor_method:
+    type: null
