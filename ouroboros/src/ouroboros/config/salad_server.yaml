@@ -1,3 +1,4 @@
+---
 place_method:
   type: Salad
   embedding_size: 8448
@@ -7,5 +8,3 @@ place_method:
 keypoint_method:
   type: SuperPoint
   max_keypoints: 1024
-descriptor_method:
-    type: null

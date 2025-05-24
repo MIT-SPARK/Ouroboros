@@ -9,7 +9,7 @@ import ouroboros as ob
 
 class GtMatchModel:
     def __init__(self, config: GtMatchModelConfig):
-        self.returns_descriptors = True
+        pass
 
     def infer(
         self, image0: ob.VlcImage, image1: ob.VlcImage, pose_hint: ob.VlcPose = None

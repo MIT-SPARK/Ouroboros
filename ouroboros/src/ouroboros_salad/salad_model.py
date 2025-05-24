@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import torch
@@ -18,7 +19,9 @@ class SaladModel:
         self.similarity_metric = "ip"
 
         if config.model_source == "torchhub":
-            model = torch.hub.load(config.model_variant, config.weight_source)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                model = torch.hub.load(config.model_variant, config.weight_source)
             self.model = model.eval().to("cuda")
         else:
             raise Exception(f"Unknown model source {config.model_source}")

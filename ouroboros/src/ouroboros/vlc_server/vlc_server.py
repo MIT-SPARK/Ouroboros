@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
@@ -28,10 +29,8 @@ class VlcServer:
         self.place_model = config.place_method.create()
         self.keypoint_model = config.keypoint_method.create()
         self.descriptor_model = config.descriptor_method.create()
-        if self.descriptor_model is None:
-            print(
-                "Desciptor method set to None. Hopefully your keypoint detector returns descriptors too..."
-            )
+        if self.descriptor_model is None and not self.keypoint_model.has_descriptors:
+            logging.error("Invalid configuration: no descriptor model specified!")
 
         self.match_model = config.match_method.create()
         self.pose_model = config.pose_method.create()

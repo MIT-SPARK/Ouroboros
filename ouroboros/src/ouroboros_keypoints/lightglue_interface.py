@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import torch
-from lightglue import LightGlue
 from spark_config import Config, register_config
 
 import ouroboros as ob
@@ -12,8 +12,11 @@ import ouroboros as ob
 
 class LightglueModel:
     def __init__(self, config: LightglueModelConfig):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from lightglue import LightGlue
+
         self.model = LightGlue(features=config.feature_type).eval().cuda()
-        self.returns_descriptors = True
 
     def infer(
         self, image0: ob.VlcImage, image1: ob.VlcImage, pose_hint: ob.VlcPose = None

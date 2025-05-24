@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import torch
-from lightglue import SuperPoint
 from spark_config import Config, register_config
 
 import ouroboros as ob
@@ -12,8 +12,12 @@ import ouroboros as ob
 
 class SuperPointModel:
     def __init__(self, config: SuperPointModelConfig):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from lightglue import SuperPoint
+
         self.model = SuperPoint(max_num_keypoints=config.max_keypoints).eval().cuda()
-        self.returns_descriptors = True
+        self.has_descriptors = True
 
     def infer(self, image: ob.SparkImage, pose_hint: ob.VlcPose = None):
         img_float = torch.tensor(
