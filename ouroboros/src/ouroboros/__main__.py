@@ -4,7 +4,6 @@ from datetime import datetime
 
 import click
 import spark_config as sc
-import tqdm
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
@@ -134,6 +133,7 @@ def bag(
         camera_info,
         depth_topic=depth_topic,
         threshold_us=sync_diff_us,
+        progress=True,
     )
     config = ob.VlcServerConfig.load(ob.config_path() / config_name)
     config.strict_keypoint_evaluation = True
@@ -149,7 +149,7 @@ def bag(
 
         num_added = 0
         session_id = _register_camera(server, loader.intrinsics, name)
-        for data in tqdm.tqdm(loader):
+        for data in loader:
             time = data.timestamp
             rgb = data.color
             depth = data.depth
