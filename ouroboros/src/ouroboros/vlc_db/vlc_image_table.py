@@ -21,6 +21,10 @@ class VlcImageTable:
         self.descriptors_store = {}
         self.pose_store = {}
 
+    @property
+    def embedding_size(self):
+        return self.embedding_store.embedding_size
+
     def has_image(self, image_uuid):
         return image_uuid in self.metadata_store
 

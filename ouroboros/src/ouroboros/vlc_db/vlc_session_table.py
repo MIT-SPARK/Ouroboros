@@ -11,7 +11,7 @@ class SessionTable:
         self._session_store = {}
 
     def add_session(self, robot_id: int, sensor_id: int = 0, name: str = None) -> str:
-        # Used when the VLC module is in charge of handling session   logic
+        # Used when the VLC module is in charge of handling session logic
 
         session_uuid = str(uuid.uuid4())
         self.insert_session(session_uuid, datetime.now(), robot_id, sensor_id, name)
