@@ -116,7 +116,7 @@ void BowVector::fromStream(std::istream& str) {
   uint32_t s;
 
   str.read((char*)&s, sizeof(s));
-  for (int i = 0; i < s; i++) {
+  for (uint32_t i = 0; i < s; i++) {
     WordId wid;
     WordValue wv;
     str.read((char*)&wid, sizeof(wid));

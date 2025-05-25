@@ -20,104 +20,28 @@
 
 #include "BowVector.h"
 #include "FeatureVector.h"
-#include "ScoringObject.h"
 
 namespace DBoW3 {
-///   Vocabulary
+
 class Vocabulary {
   friend class FastSearch;
 
  public:
-  /**
-   * Initiates an empty vocabulary
-   * @param k branching factor
-   * @param L depth levels
-   * @param weighting weighting type
-   * @param scoring scoring type
-   */
-  Vocabulary(int k = 10, int L = 5, WeightingType weighting = TF_IDF, ScoringType scoring = L1_NORM);
-
-  /**
-   * Creates the vocabulary by loading a file
-   * @param filename
-   */
   Vocabulary(const std::string& filename);
 
-  /**
-   * Creates the vocabulary by loading a file
-   * @param filename
-   */
-  Vocabulary(const char* filename);
-
-  /**
-   * Creates the vocabulary by loading an input stream
-   * @param filename
-   */
-  Vocabulary(std::istream& filename);
-
-  /**
-   * Copy constructor
-   * @param voc
-   */
-  Vocabulary(const Vocabulary& voc);
-
-  /**
-   * Destructor
-   */
-  virtual ~Vocabulary();
-
-  /**
-   * Assigns the given vocabulary to this by copying its data and removing
-   * all the data contained by this vocabulary before
-   * @param voc
-   * @return reference to this vocabulary
-   */
-  Vocabulary& operator=(const Vocabulary& voc);
-
-  /**
-   * Creates a vocabulary from the training features with the already
-   * defined parameters
-   * @param training_features
-   */
-  virtual void create(const std::vector<std::vector<cv::Mat> >& training_features);
-  /**
-   * Creates a vocabulary from the training features with the already
-   * defined parameters
-   * @param training_features. Each row of a matrix is a feature
-   */
-  virtual void create(const std::vector<cv::Mat>& training_features);
-
-  /**
-   * Creates a vocabulary from the training features, setting the branching
-   * factor and the depth levels of the tree
-   * @param training_features
-   * @param k branching factor
-   * @param L depth levels
-   */
-  virtual void create(const std::vector<std::vector<cv::Mat> >& training_features, int k, int L);
-
-  /**
-   * Creates a vocabulary from the training features, setting the branching
-   * factor nad the depth levels of the tree, and the weighting and scoring
-   * schemes
-   */
-  virtual void create(const std::vector<std::vector<cv::Mat> >& training_features,
-                      int k,
-                      int L,
-                      WeightingType weighting,
-                      ScoringType scoring);
+  ~Vocabulary() = default;
 
   /**
    * Returns the number of words in the vocabulary
    * @return number of words
    */
-  virtual inline unsigned int size() const { return (unsigned int)m_words.size(); }
+  unsigned int size() const { return (unsigned int)m_words.size(); }
 
   /**
    * Returns whether the vocabulary is empty (i.e. it has not been trained)
    * @return true iff the vocabulary is empty
    */
-  virtual inline bool empty() const { return m_words.empty(); }
+  bool empty() const { return m_words.empty(); }
 
   /** Clears the vocabulary object
    */
@@ -127,13 +51,13 @@ class Vocabulary {
    * @param features
    * @param v (out) bow vector of weighted words
    */
-  virtual void transform(const std::vector<cv::Mat>& features, BowVector& v) const;
+  void transform(const std::vector<cv::Mat>& features, BowVector& v) const;
   /**
    * Transforms a set of descriptores into a bow vector
    * @param features, one per row
    * @param v (out) bow vector of weighted words
    */
-  virtual void transform(const cv::Mat& features, BowVector& v) const;
+  void transform(const cv::Mat& features, BowVector& v) const;
   /**
    * Transform a set of descriptors into a bow vector and a feature vector
    * @param features
@@ -141,23 +65,14 @@ class Vocabulary {
    * @param fv (out) feature vector of nodes and feature indexes
    * @param levelsup levels to go up the vocabulary tree to get the node index
    */
-  virtual void transform(const std::vector<cv::Mat>& features, BowVector& v, FeatureVector& fv, int levelsup) const;
+  void transform(const std::vector<cv::Mat>& features, BowVector& v, FeatureVector& fv, int levelsup) const;
 
   /**
    * Transforms a single feature into a word (without weight)
    * @param feature
    * @return word id
    */
-  virtual WordId transform(const cv::Mat& feature) const;
-
-  /**
-   * Returns the score of two vectors
-   * @param a vector
-   * @param b vector
-   * @return score between vectors
-   * @note the vectors must be already sorted and normalized if necessary
-   */
-  double score(const BowVector& a, const BowVector& b) const { return m_scoring_object->score(a, b); }
+  WordId transform(const cv::Mat& feature) const;
 
   /**
    * Returns the id of the node that is "levelsup" levels from the word given
@@ -166,7 +81,7 @@ class Vocabulary {
    * @return node id. if levelsup is 0, returns the node id associated to the
    *   word id
    */
-  virtual NodeId getParentNode(WordId wid, int levelsup) const;
+  NodeId getParentNode(WordId wid, int levelsup) const;
 
   /**
    * Returns the ids of all the words that are under the given node id,
@@ -180,13 +95,13 @@ class Vocabulary {
    * Returns the branching factor of the tree (k)
    * @return k
    */
-  inline int getBranchingFactor() const { return m_k; }
+  int getBranchingFactor() const { return m_k; }
 
   /**
    * Returns the depth levels of the tree (L)
    * @return L
    */
-  inline int getDepthLevels() const { return m_L; }
+  int getDepthLevels() const { return m_L; }
 
   /**
    * Returns the real depth levels of the tree on average
@@ -199,38 +114,26 @@ class Vocabulary {
    * @param wid word id
    * @return descriptor
    */
-  virtual inline cv::Mat getWord(WordId wid) const;
+  cv::Mat getWord(WordId wid) const;
 
   /**
    * Returns the weight of a word
    * @param wid word id
    * @return weight
    */
-  virtual inline WordValue getWordWeight(WordId wid) const;
+  WordValue getWordWeight(WordId wid) const;
 
   /**
    * Returns the weighting method
    * @return weighting method
    */
-  inline WeightingType getWeightingType() const { return m_weighting; }
-
-  /**
-   * Returns the scoring method
-   * @return scoring method
-   */
-  inline ScoringType getScoringType() const { return m_scoring; }
+  WeightingType getWeightingType() const { return m_weighting; }
 
   /**
    * Changes the weighting method
    * @param type new weighting type
    */
-  inline void setWeightingType(WeightingType type);
-
-  /**
-   * Changes the scoring method
-   * @param type new scoring type
-   */
-  void setScoringType(ScoringType type);
+  void setWeightingType(WeightingType type);
 
   /**
    * Saves the vocabulary into a file. If filename extension contains .yml, opencv YALM format is used. Otherwise,
@@ -246,26 +149,6 @@ class Vocabulary {
   void load(const std::string& filename);
 
   /**
-   * Loads the vocabulary from an input stream created with save
-   * @param stream.
-   */
-  bool load(std::istream& stream);
-
-  /**
-   * Saves the vocabulary to a file storage structure
-   * @param fn node in file storage
-   */
-  virtual void save(cv::FileStorage& fs, const std::string& name = "vocabulary") const;
-
-  /**
-   * Loads the vocabulary from a file storage node
-   * @param fn first node
-   * @param subname name of the child node of fn where the tree is stored.
-   *   If not given, the fn node is used instead
-   */
-  virtual void load(const cv::FileStorage& fs, const std::string& name = "vocabulary");
-
-  /**
    * Stops those words whose weight is below minWeight.
    * Words are stopped by setting their weight to 0. There are not returned
    * later when transforming image features into vectors.
@@ -277,7 +160,7 @@ class Vocabulary {
    * function with a lower minWeight have no effect.
    * @return number of words stopped now
    */
-  virtual int stopWords(double minWeight);
+  int stopWords(double minWeight);
 
   /** Returns the size of the descriptor employed. If the Vocabulary is empty, returns -1
    */
@@ -285,9 +168,6 @@ class Vocabulary {
   /** Returns the type of the descriptor employed normally(8U_C1, 32F_C1)
    */
   int getDescritorType() const;
-  // io to-from a stream
-  void toStream(std::ostream& str, bool compressed = true) const throw(std::exception);
-  void fromStream(std::istream& str) throw(std::exception);
 
  protected:
   ///  reference to descriptor
@@ -324,21 +204,19 @@ class Vocabulary {
      * Returns whether the node is a leaf node
      * @return true iff the node is a leaf
      */
-    inline bool isLeaf() const { return children.empty(); }
+    bool isLeaf() const { return children.empty(); }
   };
 
  protected:
   /**
-   * Creates an instance of the scoring object accoring to m_scoring
+   * Returns the word id associated to a feature
+   * @param feature
+   * @param id (out) word id
+   * @param weight (out) word weight
+   * @param nid (out) if given, id of the node "levelsup" levels up
+   * @param levelsup
    */
-  void createScoringObject();
-
-  /**
-   * Returns a set of pointers to descriptores
-   * @param training_features all the features
-   * @param features (out) pointers to the training features
-   */
-  void getFeatures(const std::vector<std::vector<cv::Mat> >& training_features, std::vector<cv::Mat>& features) const;
+  void transform(const cv::Mat& feature, WordId& id, WordValue& weight, NodeId* nid, int levelsup = 0) const;
 
   /**
    * Returns the word id associated to a feature
@@ -348,47 +226,14 @@ class Vocabulary {
    * @param nid (out) if given, id of the node "levelsup" levels up
    * @param levelsup
    */
-  virtual void transform(const cv::Mat& feature, WordId& id, WordValue& weight, NodeId* nid, int levelsup = 0) const;
-  /**
-   * Returns the word id associated to a feature
-   * @param feature
-   * @param id (out) word id
-   * @param weight (out) word weight
-   * @param nid (out) if given, id of the node "levelsup" levels up
-   * @param levelsup
-   */
-  virtual void transform(const cv::Mat& feature, WordId& id, WordValue& weight) const;
+  void transform(const cv::Mat& feature, WordId& id, WordValue& weight) const;
 
   /**
    * Returns the word id associated to a feature
    * @param feature
    * @param id (out) word id
    */
-  virtual void transform(const cv::Mat& feature, WordId& id) const;
-
-  /**
-   * Creates a level in the tree, under the parent, by running kmeans with
-   * a descriptor set, and recursively creates the subsequent levels too
-   * @param parent_id id of parent node
-   * @param descriptors descriptors to run the kmeans on
-   * @param current_level current level in the tree
-   */
-  void HKmeansStep(NodeId parent_id, const std::vector<cv::Mat>& descriptors, int current_level);
-
-  /**
-   * Creates k clusters from the given descriptors with some seeding algorithm.
-   * @note In this class, kmeans++ is used, but this function should be
-   *   overriden by inherited classes.
-   */
-  virtual void initiateClusters(const std::vector<cv::Mat>& descriptors, std::vector<cv::Mat>& clusters) const;
-
-  /**
-   * Creates k clusters from the given descriptor sets by running the
-   * initial step of kmeans++
-   * @param descriptors
-   * @param clusters resulting clusters
-   */
-  void initiateClustersKMpp(const std::vector<cv::Mat>& descriptors, std::vector<cv::Mat>& clusters) const;
+  void transform(const cv::Mat& feature, WordId& id) const;
 
   /**
    * Create the words of the vocabulary once the tree has been built
@@ -410,10 +255,6 @@ class Vocabulary {
    */
   friend std::ostream& operator<<(std::ostream& os, const Vocabulary& voc);
 
-  /**Loads from ORBSLAM txt files
-   */
-  void load_fromtxt(const std::string& filename) throw(std::runtime_error);
-
  protected:
   /// Branching factor
   int m_k;
@@ -424,12 +265,6 @@ class Vocabulary {
   /// Weighting method
   WeightingType m_weighting;
 
-  /// Scoring method
-  ScoringType m_scoring;
-
-  /// Object for computing scores
-  GeneralScoring* m_scoring_object;
-
   /// Tree nodes
   std::vector<Node> m_nodes;
 
@@ -439,7 +274,7 @@ class Vocabulary {
 
  public:
   // for debug (REMOVE)
-  inline Node* getNodeWord(uint32_t idx) { return m_words[idx]; }
+  Node* getNodeWord(uint32_t idx) { return m_words[idx]; }
 };
 
 }  // namespace DBoW3

@@ -11,13 +11,6 @@ endif()
 
 option(BUILD_SHARED_LIBS "Set to OFF to build static libraries" ON)
 
-add_library(
-  ${PROJECT_NAME}
-  src/BowVector.cpp
-  src/Database.cpp
-  src/DescManip.cpp
-  src/FeatureVector.cpp
-  src/QueryResults.cpp
-  src/ScoringObject.cpp
-  src/Vocabulary.cpp)
+add_library(${PROJECT_NAME} src/BowVector.cpp src/DescManip.cpp
+                            src/FeatureVector.cpp src/Vocabulary.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC src)
