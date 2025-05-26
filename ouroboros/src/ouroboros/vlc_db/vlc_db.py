@@ -1,5 +1,6 @@
 import pathlib
 import pickle
+import re
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, TypeVar, Union
 
@@ -22,6 +23,13 @@ class KeypointSizeException(BaseException):
 
 
 T = TypeVar("T")
+
+
+def _get_matcher(criteria: Optional[List[str]]):
+    if not criteria:
+        return re.compile(".*")
+
+    return re.compile("|".join([f"^{x}$" for x in criteria]))
 
 
 class VlcDb:
@@ -52,10 +60,17 @@ class VlcDb:
     def embedding_size(self):
         return self._image_table.embedding_size
 
-    @property
-    def sessions(self):
-        for session_uuid in self._session_table._session_store:
-            yield session_uuid
+    def sessions(self, uuids=None, names=None):
+        uuid_re = _get_matcher(uuids)
+        names_re = _get_matcher(names)
+        for uid, session in self._session_table._session_store.items():
+            if not uuid_re.match(uid):
+                continue
+
+            if not names_re.match(session.name):
+                continue
+
+            yield session
 
     def add_image(
         self,
@@ -81,8 +96,8 @@ class VlcDb:
     def get_image_keys(self) -> [str]:
         return self._image_table.get_image_keys()
 
-    def iterate_images(self):
-        for image in self._image_table.iterate_images():
+    def iterate_images(self, session_id=None):
+        for image in self._image_table.iterate_images(session_id=session_id):
             yield image
 
     def query_embeddings(

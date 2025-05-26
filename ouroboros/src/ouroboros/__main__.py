@@ -1,9 +1,12 @@
 import logging
 import pathlib
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 import click
 import spark_config as sc
+import tqdm
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
@@ -170,6 +173,105 @@ def bag(
         output_path = append
 
     server.save_db(output_path)
+
+
+@dataclass
+class MatcherConfig(sc.Config):
+    place_metric: str = "ip"
+    place_match_threshold: float = 0.8
+    lc_frame_lockout_s: int = 30
+    match_method: Any = sc.config_field("match_model", default="Lightglue")
+    pose_method: Any = sc.config_field("pose_model", default="opengv")
+
+
+class Matcher:
+    def __init__(self, config):
+        self.config = config
+        self.match_model = config.match_method.create()
+        self.pose_model = config.pose_method.create()
+
+    @classmethod
+    def load(cls, path):
+        config = sc.Config.load(MatcherConfig, path)
+        return cls(config)
+
+    def find(self, db, query, search_uuid, need_lockout):
+        max_time_ns = query.metadata.epoch_ns
+        if need_lockout:
+            max_time_ns -= int(1.0e9 * self.config.lc_frame_lockout_s)
+
+        matches, sims = db.query_embeddings_max_time(
+            query.embedding,
+            1,
+            [query.metadata.session_id],
+            max_time_ns,
+            similarity_metric=self.config.place_metric,
+            search_sessions=[search_uuid],
+        )
+
+        if len(sims) == 0 or sims[0] < self.config.place_match_threshold:
+            return None
+
+        match = matches[0]
+        query_kp, match_kp, query_to_match = self.match_model.infer(query, match)
+
+        # Extract pose
+        cam_q = db.get_camera(query.metadata).camera
+        cam_m = db.get_camera(match.metadata).camera
+        lc = self.pose_model.recover_pose(cam_q, query, cam_m, match, query_to_match)
+        if not lc:
+            return None
+
+        return ob.SparkLoopClosure(
+            from_image_uuid=query.metadata.image_uuid,
+            to_image_uuid=match.metadata.image_uuid,
+            f_T_t=lc.match_T_query,
+            is_metric=lc.is_metric,
+            quality=1,
+        )
+
+
+@cli.command()
+@click.argument("db_path", type=click.Path(exists=True))
+@click.option("--uuid", "-u", help="session to use", multiple=True)
+@click.option("--name", "-n", help="session to use", multiple=True)
+@click.option("--config-name", "-c", default="salad_server.yaml")
+@click.option("--output", "-o", type=click.Path())
+def loopclose(db_path, uuid, name, config_name, output):
+    """
+    Compute loop-closures between saved sessions.
+
+    Positional Arguments:
+        DB_PATH: Path to VLC DB containing sessions
+    """
+    plugins = sc.discover_plugins("ouroboros_")
+    logging.info(f"Discovered Plugins: {[x for x in plugins]}")
+
+    db = ob.VlcDb.load(db_path)
+    matcher = Matcher.load(ob.config_path() / config_name)
+    sessions = list(db.sessions(uuids=uuid, names=name))
+
+    N = len(sessions)
+    found = []
+    for i in range(N):
+        for j in range(i, N):
+            name_i = sessions[i].name
+            name_j = sessions[j].name
+            logging.info(f"Checking session '{name_i}' -> '{name_j}'")
+
+            match_session = sessions[j].session_uuid
+            for query in tqdm.tqdm(db.iterate_images(session_id=match_session)):
+                if query.embedding is None:
+                    logging.warning(f"Image {query.image_uuid} missing embedding!")
+                    continue
+
+                lc = matcher.find(db, query, sessions[j].session_uuid, i == j)
+                if lc is None:
+                    continue
+
+                found.append(lc)
+
+    click.secho(f"Found {len(found)} loop closures")
 
 
 if __name__ == "__main__":

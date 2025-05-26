@@ -22,6 +22,7 @@ dependencies = [
     "scipy>=1.4.0",
     "spark_config @ git+https://github.com/MIT-SPARK/Spark-Config@main",
     "spark_dataset_interfaces @ git+https://github.com/MIT-SPARK/spark_dataset_interfaces@main",
+    "tqdm",
 ]
 
 [project.optional-dependencies]

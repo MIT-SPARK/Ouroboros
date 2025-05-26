@@ -47,15 +47,17 @@ class VlcImageTable:
         )
         return vlc_image
 
-    def get_image_keys(self):
+    def get_image_keys(self, session_id=None):
         ts_keys = [
-            (metadata.epoch_ns, key) for key, metadata in self.metadata_store.items()
+            (metadata.epoch_ns, key)
+            for key, metadata in self.metadata_store.items()
+            if session_id is None or metadata.session_id == session_id
         ]
         return [key for _, key in sorted(ts_keys)]
 
-    def iterate_images(self):
+    def iterate_images(self, session_id=None):
         """Iterate through images according to ascending timestamp"""
-        for key in self.get_image_keys():
+        for key in self.get_image_keys(session_id=session_id):
             yield self.get_image(key)
 
     def query_embeddings(
