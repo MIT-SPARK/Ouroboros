@@ -1,5 +1,6 @@
 import logging
 import pathlib
+import pickle
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -236,7 +237,7 @@ class Matcher:
 @click.option("--uuid", "-u", help="session to use", multiple=True)
 @click.option("--name", "-n", help="session to use", multiple=True)
 @click.option("--config-name", "-c", default="salad_server.yaml")
-@click.option("--output", "-o", type=click.Path())
+@click.option("--output", "-o", type=click.Path(), default=None)
 def loopclose(db_path, uuid, name, config_name, output):
     """
     Compute loop-closures between saved sessions.
@@ -247,6 +248,7 @@ def loopclose(db_path, uuid, name, config_name, output):
     plugins = sc.discover_plugins("ouroboros_")
     logging.info(f"Discovered Plugins: {[x for x in plugins]}")
 
+    db_path = pathlib.Path(db_path).expanduser().resolve()
     db = ob.VlcDb.load(db_path)
     matcher = Matcher.load(ob.config_path() / config_name)
     sessions = list(db.sessions(uuids=uuid, names=name))
@@ -272,6 +274,13 @@ def loopclose(db_path, uuid, name, config_name, output):
                 found.append(lc)
 
     click.secho(f"Found {len(found)} loop closures")
+    if output is None:
+        output = db_path.parent / f"{db_path.stem}_loop_closures.pkl"
+    else:
+        output = pathlib.Path(output).expanduser().absolute()
+
+    with output.open("wb") as fout:
+        pickle.dump(found, fout)
 
 
 if __name__ == "__main__":
