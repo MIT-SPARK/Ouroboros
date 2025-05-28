@@ -1,6 +1,6 @@
+import json
 import logging
 import pathlib
-import pickle
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -8,6 +8,7 @@ from typing import Any
 import click
 import spark_config as sc
 import tqdm
+from scipy.spatial.transform import Rotation as Rot
 from spark_dataset_interfaces.rosbag_dataloader import RosbagDataLoader
 
 import ouroboros as ob
@@ -179,7 +180,7 @@ def bag(
 @dataclass
 class MatcherConfig(sc.Config):
     place_metric: str = "ip"
-    place_match_threshold: float = 0.8
+    place_match_threshold: float = 0.9
     lc_frame_lockout_s: int = 30
     match_method: Any = sc.config_field("match_model", default="Lightglue")
     pose_method: Any = sc.config_field("pose_model", default="opengv")
@@ -223,13 +224,7 @@ class Matcher:
         if not lc:
             return None
 
-        return ob.SparkLoopClosure(
-            from_image_uuid=query.metadata.image_uuid,
-            to_image_uuid=match.metadata.image_uuid,
-            f_T_t=lc.match_T_query,
-            is_metric=lc.is_metric,
-            quality=1,
-        )
+        return match, lc
 
 
 @cli.command()
@@ -253,34 +248,44 @@ def loopclose(db_path, uuid, name, config_name, output):
     matcher = Matcher.load(ob.config_path() / config_name)
     sessions = list(db.sessions(uuids=uuid, names=name))
 
-    N = len(sessions)
     found = []
+    N = len(sessions)
     for i in range(N):
         for j in range(i, N):
-            name_i = sessions[i].name
-            name_j = sessions[j].name
-            logging.info(f"Checking session '{name_i}' -> '{name_j}'")
+            s_query = sessions[i]
+            s_match = sessions[j]
+            logging.info(f"Checking session '{s_query.name}' -> '{s_match.name}'")
 
-            match_session = sessions[j].session_uuid
-            for query in tqdm.tqdm(db.iterate_images(session_id=match_session)):
+            for query in tqdm.tqdm(db.iterate_images(session_id=s_query.session_uuid)):
                 if query.embedding is None:
                     logging.warning(f"Image {query.image_uuid} missing embedding!")
                     continue
 
-                lc = matcher.find(db, query, sessions[j].session_uuid, i == j)
-                if lc is None:
+                match_info = matcher.find(db, query, s_query.session_uuid, i == j)
+                if match_info is None:
                     continue
 
-                found.append(lc)
+                match, lc = match_info
+                to_T_from = ob.invert_pose(lc.match_T_query)
+                q = Rot.from_matrix(to_T_from[:3, :3]).as_quat()
+                record = {
+                    "robot_from": s_match.name,
+                    "robot_to": s_query.name,
+                    "time_from": match.metadata.epoch_ns,
+                    "time_to": query.metadata.epoch_ns,
+                    "in_body_frame": False,
+                    "to_p_from": to_T_from[:3, 3].tolist(),
+                    "to_R_from": {"w": q[3], "x": q[0], "y": q[1], "z": q[2]},
+                }
+                found.append(record)
 
-    click.secho(f"Found {len(found)} loop closures")
     if output is None:
-        output = db_path.parent / f"{db_path.stem}_loop_closures.pkl"
+        output = db_path.parent / f"{db_path.stem}.json"
     else:
         output = pathlib.Path(output).expanduser().absolute()
 
-    with output.open("wb") as fout:
-        pickle.dump(found, fout)
+    with output.open("w") as fout:
+        json.dump(found, fout)
 
 
 if __name__ == "__main__":
