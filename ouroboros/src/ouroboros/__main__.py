@@ -266,15 +266,14 @@ def loopclose(db_path, uuid, name, config_name, output):
                     continue
 
                 match, lc = match_info
-                to_T_from = ob.invert_pose(lc.match_T_query)
-                q = Rot.from_matrix(to_T_from[:3, :3]).as_quat()
+                q = Rot.from_matrix(lc.match_T_query[:3, :3]).as_quat()
                 record = {
-                    "robot_from": s_match.name,
-                    "robot_to": s_query.name,
-                    "time_from": match.metadata.epoch_ns,
-                    "time_to": query.metadata.epoch_ns,
+                    "robot_from": s_query.name,
+                    "robot_to": s_match.name,
+                    "time_from": query.metadata.epoch_ns,
+                    "time_to": match.metadata.epoch_ns,
                     "in_body_frame": False,
-                    "to_p_from": to_T_from[:3, 3].tolist(),
+                    "to_p_from": lc.match_T_query[:3, 3].tolist(),
                     "to_R_from": {"w": q[3], "x": q[0], "y": q[1], "z": q[2]},
                 }
                 found.append(record)
