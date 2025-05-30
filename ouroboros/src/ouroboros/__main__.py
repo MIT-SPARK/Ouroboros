@@ -180,7 +180,7 @@ def bag(
 @dataclass
 class MatcherConfig(sc.Config):
     place_metric: str = "ip"
-    place_match_threshold: float = 0.8
+    place_match_threshold: float = 0.65
     lc_frame_lockout_s: int = 30
     match_method: Any = sc.config_field("match_model", default="Lightglue")
     pose_method: Any = sc.config_field("pose_model", default="opengv")
