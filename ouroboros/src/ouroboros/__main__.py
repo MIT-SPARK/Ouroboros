@@ -180,7 +180,7 @@ def bag(
 @dataclass
 class MatcherConfig(sc.Config):
     place_metric: str = "ip"
-    place_match_threshold: float = 0.9
+    place_match_threshold: float = 0.8
     lc_frame_lockout_s: int = 30
     match_method: Any = sc.config_field("match_model", default="Lightglue")
     pose_method: Any = sc.config_field("pose_model", default="opengv")
@@ -198,9 +198,9 @@ class Matcher:
         return cls(config)
 
     def find(self, db, query, search_uuid, need_lockout):
-        max_time_ns = query.metadata.epoch_ns
+        max_time_ns = float('inf')
         if need_lockout:
-            max_time_ns -= int(1.0e9 * self.config.lc_frame_lockout_s)
+            max_time_ns = query.metadata.epoch_ns - int(1.0e9 * self.config.lc_frame_lockout_s)
 
         matches, sims = db.query_embeddings_max_time(
             query.embedding,
@@ -256,12 +256,13 @@ def loopclose(db_path, uuid, name, config_name, output):
             s_match = sessions[j]
             logging.info(f"Checking session '{s_query.name}' -> '{s_match.name}'")
 
+            count = 0
             for query in tqdm.tqdm(db.iterate_images(session_id=s_query.session_uuid)):
                 if query.embedding is None:
                     logging.warning(f"Image {query.image_uuid} missing embedding!")
                     continue
 
-                match_info = matcher.find(db, query, s_query.session_uuid, i == j)
+                match_info = matcher.find(db, query, s_match.session_uuid, i == j)
                 if match_info is None:
                     continue
 
@@ -277,6 +278,8 @@ def loopclose(db_path, uuid, name, config_name, output):
                     "to_R_from": {"w": q[3], "x": q[0], "y": q[1], "z": q[2]},
                 }
                 found.append(record)
+                count += 1
+            print(f"Found {count} loop closures")
 
     if output is None:
         output = db_path.parent / f"{db_path.stem}.json"
