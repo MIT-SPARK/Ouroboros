@@ -8,3 +8,14 @@ place_method:
 keypoint_method:
   type: SuperPoint
   max_keypoints: 1024
+match_method:
+  type: Lightglue
+  feature_type: superpoint
+pose_method:
+  type: opengv
+  scale_recovery: true
+  use_pnp_for_scale: false
+  ransac:
+    inlier_tolerance: 1.0e-6
+  scale_ransac:
+    inlier_tolerance: 1.0e-1
