@@ -198,9 +198,11 @@ class Matcher:
         return cls(config)
 
     def find(self, db, query, search_uuid, need_lockout):
-        max_time_ns = float('inf')
+        max_time_ns = float("inf")
         if need_lockout:
-            max_time_ns = query.metadata.epoch_ns - int(1.0e9 * self.config.lc_frame_lockout_s)
+            max_time_ns = query.metadata.epoch_ns - int(
+                1.0e9 * self.config.lc_frame_lockout_s
+            )
 
         matches, sims = db.query_embeddings_max_time(
             query.embedding,
