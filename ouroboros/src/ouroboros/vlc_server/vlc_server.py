@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,10 +29,8 @@ class VlcServer:
         self.place_model = config.place_method.create()
         self.keypoint_model = config.keypoint_method.create()
         self.descriptor_model = config.descriptor_method.create()
-        if self.descriptor_model is None:
-            print(
-                "Desciptor method set to None. Hopefully your keypoint detector returns descriptors too..."
-            )
+        if self.descriptor_model is None and not self.keypoint_model.has_descriptors:
+            logging.error("Invalid configuration: no descriptor model specified!")
 
         self.match_model = config.match_method.create()
         self.pose_model = config.pose_method.create()
@@ -41,6 +40,19 @@ class VlcServer:
 
         self.vlc_db = ob.VlcDb(self.place_model.embedding_size)
 
+    def load_db(self, input_path):
+        loaded = ob.VlcDb.load(input_path)
+        N_curr = self.vlc_db.embedding_size
+        N_load = loaded.embedding_size
+        if N_load != N_curr:
+            logging.error(f"Loaded embedding sizes do not match: {N_curr} != {N_load}")
+            return
+
+        self.vlc_db = loaded
+
+    def save_db(self, output_path):
+        self.vlc_db.save(output_path)
+
     def register_camera(
         self,
         sensor_id: int,
@@ -48,7 +60,7 @@ class VlcServer:
         calibration_time: Union[datetime, int],
         name: str = None,
     ) -> str:
-        session_id = self.vlc_db.add_session(self.robot_id, sensor_id)
+        session_id = self.vlc_db.add_session(self.robot_id, sensor_id, name=name)
         if isinstance(calibration_time, datetime):
             calibration_time = epoch_ns_from_datetime(calibration_time)
         self.vlc_db.add_camera(session_id, calibration, calibration_time)
@@ -61,29 +73,24 @@ class VlcServer:
         time_ns: int,
         pose_hint: ob.VlcPose = None,
     ) -> str:
-        # Compute embedding
+        # Compute embedding and add image and embedding to database
         embedding = self.place_model.infer(image, pose_hint)
-
-        # Add image and embedding
-        image_id = self.vlc_db.add_image(
-            session_id, time_ns, image, pose_hint=pose_hint
-        )
-        vlc_image = self.vlc_db.update_embedding(image_id, embedding)
+        img_id = self.vlc_db.add_image(session_id, time_ns, image, pose_hint=pose_hint)
+        vlc_image = self.vlc_db.update_embedding(img_id, embedding)
 
         if self.strict_keypoint_evaluation:
             # Optionally force all keypoints/descriptors to be computed when
             # frame is added to db, and not lazily upon finding match
-            image_keypoints, image_descriptors = self.keypoint_model.infer(
-                vlc_image.image, pose_hint
-            )
-            if image_descriptors is None:
-                image_descriptors = self.descriptor_model.infer(
-                    vlc_image.image, image_keypoints, pose_hint
-                )
-            vlc_image = self.vlc_db.update_keypoints(
-                image_id, image_keypoints, image_descriptors
-            )
-        return image_id
+            kpts, descs = self.keypoint_model.infer(vlc_image.image, pose_hint)
+            if self.descriptor_model is not None:
+                descs = self.descriptor_model.infer(vlc_image.image, kpts, pose_hint)
+
+            vlc_image = self.vlc_db.update_keypoints(img_id, kpts, descs)
+            keypoint_depths = vlc_image.get_feature_depths()
+            if keypoint_depths is not None:
+                self.vlc_db.update_keypoint_depths(img_id, keypoint_depths)
+
+        return img_id
 
     def add_embedding_no_image(
         self,

@@ -1,3 +1,6 @@
+import pathlib
+import pickle
+import re
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, TypeVar, Union
 
@@ -22,12 +25,52 @@ class KeypointSizeException(BaseException):
 T = TypeVar("T")
 
 
+def _get_matcher(criteria: Optional[List[str]]):
+    if not criteria:
+        return re.compile(".*")
+
+    return re.compile("|".join([f"^{x}$" for x in criteria]))
+
+
 class VlcDb:
     def __init__(self, image_embedding_dimension):
         self._image_table = VlcImageTable(image_embedding_dimension)
         self._lc_table = LcTable()
         self._session_table = SessionTable()
         self._camera_table = CameraTable()
+
+    def save(self, output_path):
+        """Save the VLC database."""
+        output_path = pathlib.Path(output_path).expanduser().absolute()
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        with output_path.open("wb") as fout:
+            # NOTE(nathan) intentionally hiding that we use pickle from the public API
+            # in case we decide on a different storage format
+            pickle.dump(self, fout)
+
+    @classmethod
+    def load(cls, input_path):
+        input_path = pathlib.Path(input_path).expanduser().absolute()
+        with input_path.open("rb") as fin:
+            # NOTE(nathan) intentionally hiding that we use pickle from the public API
+            # in case we decide on a different storage format
+            return pickle.load(fin)
+
+    @property
+    def embedding_size(self):
+        return self._image_table.embedding_size
+
+    def sessions(self, uuids=None, names=None):
+        uuid_re = _get_matcher(uuids)
+        names_re = _get_matcher(names)
+        for uid, session in self._session_table._session_store.items():
+            if not uuid_re.match(uid):
+                continue
+
+            if not names_re.match(session.name):
+                continue
+
+            yield session
 
     def add_image(
         self,
@@ -53,8 +96,8 @@ class VlcDb:
     def get_image_keys(self) -> [str]:
         return self._image_table.get_image_keys()
 
-    def iterate_images(self):
-        for image in self._image_table.iterate_images():
+    def iterate_images(self, session_id=None):
+        for image in self._image_table.iterate_images(session_id=session_id):
             yield image
 
     def query_embeddings(
@@ -220,9 +263,9 @@ class VlcDb:
         return self.get_image(image_uuid)
 
     def update_keypoints(self, image_uuid: str, keypoints, descriptors=None):
-        if descriptors is not None:
-            if len(keypoints) != len(descriptors):
-                raise KeypointSizeException()
+        if descriptors is not None and len(keypoints) != len(descriptors):
+            raise KeypointSizeException()
+
         self._image_table.update_keypoints(
             image_uuid, keypoints, descriptors=descriptors
         )

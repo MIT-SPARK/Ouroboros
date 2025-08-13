@@ -11,6 +11,10 @@ class InvertibleVectorStore:
         self._uuid_to_vector = {}
         self._local_idx_to_uuid = {}
 
+    @property
+    def embedding_size(self):
+        return self._vectors.shape[1]
+
     def __contains__(self, key):
         return key in self._uuid_to_vector
 

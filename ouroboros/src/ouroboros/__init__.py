@@ -1,3 +1,4 @@
+from ouroboros.config import config_path
 from ouroboros.pose_recovery import *
 from ouroboros.vlc_db import (
     KeypointSizeException,
