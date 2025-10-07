@@ -9,25 +9,32 @@
 
 #pragma once
 
+#include <Eigen/Dense>
 #include <string>
 #include <vector>
 
 #include "BowVector.h"
-#include "FeatureVector.h"
 
 namespace DBoW3 {
 
+template <typename T>
+using Descriptors = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+template <typename T>
+using Descriptor = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+
+template <typename T>
 class Vocabulary {
  public:
   Vocabulary(const std::string& filename);
 
   ~Vocabulary() = default;
 
-  void transform(const std::vector<cv::Mat>& features, BowVector& v) const;
+  void transform(const Descriptors<T>& features, BowVector& v) const;
 
-  void save(const std::string& filename, bool binary_compressed = true) const;
+  void save(const std::string& filename, bool compressed = true) const;
 
-  void load(const std::string& filename);
+  bool load(const std::string& filename);
 
  protected:
   struct Node {
@@ -35,7 +42,7 @@ class Vocabulary {
     WordValue weight;
     std::vector<NodeId> children;
     NodeId parent;
-    cv::Mat descriptor;
+    Descriptor<T> descriptor;
     WordId word_id;
 
     Node() : id(0), weight(0), parent(0), word_id(0) {}
@@ -44,11 +51,12 @@ class Vocabulary {
     bool isLeaf() const { return children.empty(); }
   };
 
-  void transform(const cv::Mat& feature, WordId& id, WordValue& weight) const;
+  void lookup(const Descriptor<T>& feature, WordId& id, WordValue& weight) const;
 
   int m_k;
   int m_L;
   WeightingType m_weighting;
+  ScoringType m_scoring;
   std::vector<Node> m_nodes;
   std::vector<Node*> m_words;
 };
