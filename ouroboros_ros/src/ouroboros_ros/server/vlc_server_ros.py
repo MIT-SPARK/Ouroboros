@@ -194,7 +194,7 @@ class VlcServerRos(Node):
     def get_camera_config_ros(self):
         rate = self.create_rate(10)
         while rclpy.ok():
-            info_msg = self.wait_for_message("camera_info", CameraInfo, timeout=5)
+            info_msg = self.wait_for_message("~/camera_info", CameraInfo, timeout=5)
             if info_msg is not None:
                 pinhole = parse_camera_info(info_msg)
                 return pinhole
